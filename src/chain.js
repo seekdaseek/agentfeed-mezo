@@ -72,8 +72,12 @@ export function makeChain(cfg) {
 
     // Normalised receipt for the plain-transfer scheme.
     async transferReceipt(hash) {
-      let r;
-      try { r = await pub.getTransactionReceipt({ hash }); } catch { return null; }
+      // The public RPC is several nodes that index at different speeds: give a fresh receipt a few seconds to appear.
+      let r = null;
+      for (let i = 0; i < 8 && !r; i++) {
+        try { r = await pub.getTransactionReceipt({ hash }); } catch { if (i < 7) await new Promise((res) => setTimeout(res, 1000)); }
+      }
+      if (!r) return null;
       const [block, head] = await Promise.all([pub.getBlock({ blockNumber: r.blockNumber }), pub.getBlockNumber()]);
       return {
         status: r.status,

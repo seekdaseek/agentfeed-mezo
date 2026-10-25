@@ -7,3 +7,4 @@ node_modules/
 .DS_Store
 video-work/
 BRIEF-*.md
+.deck-filled.html

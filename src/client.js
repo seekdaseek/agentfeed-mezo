@@ -70,8 +70,16 @@ export function createAgent({
       const signature = await account.signMessage({ message: claimMessage(accept.extra.nonce, hash) });
       payment = { x402Version: 2, scheme, network: accept.network, asset: accept.asset, payTo: accept.payTo, amount: accept.amount, nonce: accept.extra.nonce, payload: { txHash: hash, signature } };
     }
-    const second = await fetchImpl(url, { headers: { 'payment-signature': b64(payment) } });
-    const body = await second.json().catch(() => ({}));
+    const send = () => fetchImpl(url, { headers: { 'payment-signature': b64(payment) } });
+    let second = await send();
+    let body = await second.json().catch(() => ({}));
+    // A transfer is already on-chain, so a refusal that only means "the gateway's RPC node has not seen it yet" is retried
+    // with the same payment while the challenge is still valid (it is never retried for permit: that signature is single-use).
+    for (let i = 0; i < 4 && scheme === 'transfer' && !second.ok && ['tx_not_found', 'not_enough_confirmations', 'chain_unavailable'].includes(body.error); i++) {
+      await new Promise((r) => setTimeout(r, 2500));
+      second = await send();
+      body = await second.json().catch(() => ({}));
+    }
     const receipt = second.headers.get('payment-response') ? unb64(second.headers.get('payment-response')) : null;
     return { ok: second.ok, status: second.status, body, receipt, ms: Date.now() - t0, paid: second.ok ? { tx: receipt?.transaction, url: `${explorer}/tx/${receipt?.transaction}` } : null };
   }
@@ -86,6 +94,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const scheme = flag('--scheme', 'permit');
   const n = Number(flag('--n', '1'));
   const gap = Number(flag('--gap-ms', '0'));
+  const pretty = args.includes('--pretty') ? (args.splice(args.indexOf('--pretty'), 1), true) : false;
   const [route, ...kv] = args;
   if (!route || !process.env.AGENT_PRIVATE_KEY) {
     console.error('usage: AGENT_PRIVATE_KEY=0x... [GATEWAY_URL=...] node src/client.js <route> [k=v ...] [--scheme permit|transfer] [--n N]');
@@ -99,7 +108,11 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
       const r = await agent.call(route, params, { scheme });
       if (r.ok) okCount++;
       const preview = JSON.stringify(r.body.data ?? r.body).slice(0, 160);
-      console.log(JSON.stringify({ i: i + 1, route, scheme, status: r.status, ms: r.ms, tx: r.paid?.tx, explorer: r.paid?.url, error: r.ok ? undefined : r.body.error, preview }));
+      if (pretty) {
+        console.log(`${r.ok ? 'paid' : 'refused'}  status ${r.status}  ${(r.ms / 1000).toFixed(1)} s  ${scheme}  ${r.body.paid ? `${r.body.paid.amount_musd} MUSD` : r.body.error}`);
+        if (r.paid) console.log(`tx    ${r.paid.tx}\nlink  ${r.paid.url}`);
+        console.log(`data  ${preview}`);
+      } else console.log(JSON.stringify({ i: i + 1, route, scheme, status: r.status, ms: r.ms, tx: r.paid?.tx, explorer: r.paid?.url, error: r.ok ? undefined : r.body.error, preview }));
     } catch (e) { console.log(JSON.stringify({ i: i + 1, route, scheme, error: e.message })); }
     if (gap) await new Promise((r) => setTimeout(r, gap));
   }

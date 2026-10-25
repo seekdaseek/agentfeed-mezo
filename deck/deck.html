@@ -1,0 +1,94 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>AgentFeed on Mezo</title>
+<style>
+@page { size: 1280px 720px; margin: 0 }
+*{box-sizing:border-box;margin:0}
+body{background:#0e0f13;color:#ece9e4;font:24px/1.45 -apple-system,"Helvetica Neue",Arial,sans-serif}
+.s{width:1280px;height:720px;padding:64px 80px;page-break-after:always;position:relative;overflow:hidden;background:#0e0f13}
+.s:last-child{page-break-after:auto}
+h1{font-size:68px;line-height:1.05;letter-spacing:-1.5px}h2{font-size:46px;line-height:1.1;letter-spacing:-.8px;margin-bottom:28px}
+.acc{color:#f7931a}.mut{color:#9a9aa3}
+.k{font:600 16px/1 ui-monospace,Menlo,monospace;letter-spacing:2px;color:#f7931a;text-transform:uppercase;margin-bottom:22px}
+ul{list-style:none;padding:0}li{margin:0 0 16px;padding-left:28px;position:relative}li:before{content:"";position:absolute;left:0;top:14px;width:12px;height:12px;border-radius:3px;background:#f7931a}
+code,.m{font:20px ui-monospace,Menlo,monospace;background:#171922;border:1px solid #2a2e3b;border-radius:8px;padding:2px 8px}
+.row{display:flex;gap:24px}.card{flex:1;background:#171922;border:1px solid #2a2e3b;border-radius:16px;padding:26px 28px}
+.big{font-size:84px;font-weight:700;color:#f7931a;line-height:1;letter-spacing:-2px}.lbl{color:#9a9aa3;font-size:22px;margin-top:10px}
+.foot{position:absolute;left:80px;bottom:30px;color:#6b6e7a;font:15px ui-monospace,Menlo,monospace}.n{position:absolute;right:80px;bottom:30px;color:#6b6e7a;font:15px ui-monospace,Menlo,monospace}
+table{border-collapse:collapse;width:100%;font-size:21px}td,th{padding:9px 14px;border-bottom:1px solid #2a2e3b;text-align:left}th{color:#9a9aa3;font-weight:500}
+pre{font:17px/1.5 ui-monospace,Menlo,monospace;background:#171922;border:1px solid #2a2e3b;border-radius:14px;padding:20px 24px;color:#d6dde6}
+</style></head><body>
+
+<section class="s"><div class="k">Mezo Buildathon · Wave 1 · Track 2</div>
+<h1>AI agents pay for data<br>in <span class="acc">MUSD</span>.</h1>
+<p class="mut" style="margin-top:34px;font-size:30px;max-width:900px">AgentFeed is a live crypto-data API for agents. This is its new rail: one signed permit, no account, no API key, no gas.</p>
+<p style="margin-top:44px" class="m">mezo.ochinimus.app</p>
+<div class="foot">agentfeed-mezo · github.com/seekdaseek/agentfeed-mezo</div><div class="n">1</div></section>
+
+<section class="s"><div class="k">Problem</div><h2>Agents are customers that banks and APIs can't serve.</h2>
+<ul>
+<li>An agent can't open an account, pass KYC or keep a monthly subscription.</li>
+<li>It holds a wallet, not an API key, and often no gas token on the chain it pays on.</li>
+<li>Stablecoin payments for agents exist, but most are built for USDC and EIP-3009. <b class="acc">MUSD, Bitcoin-backed and on Mezo, has none of that plumbing.</b></li>
+<li>So the Bitcoin economy's own dollar is not yet something an agent can spend.</li></ul>
+<div class="foot">Track 2: how might we make MUSD easier to discover, access and use?</div><div class="n">2</div></section>
+
+<section class="s"><div class="k">What it does</div><h2>One HTTP call. One signature. Paid in MUSD.</h2>
+<pre>$ curl -i mezo.ochinimus.app/api/liquidations
+HTTP/2 402 Payment Required
+payment-required: { asset: MUSD 0x1189…c503,
+  network: eip155:31611, amount: 0.02 MUSD,
+  payTo: treasury, nonce: …, expires: 300 s }
+
+# agent signs an EIP-2612 permit, retries with it
+HTTP/2 200   data + explorer link to the settlement</pre>
+<ul style="margin-top:24px"><li>8 routes at 1 to 5 cents: prices, liquidations, funding, market snapshot, trade context, summarize.</li>
+<li>Client script and an MCP server: <code>list_routes</code>, <code>call_route</code>.</li></ul>
+<div class="foot">permit by default · plain MUSD transfer also accepted</div><div class="n">3</div></section>
+
+<section class="s"><div class="k">Live numbers · read from the gateway's ledger</div><h2>Real payments on Mezo testnet. Not mocks.</h2>
+<div class="row"><div class="card"><div class="big">@@COUNT@@</div><div class="lbl">paid calls settled</div></div>
+<div class="card"><div class="big">@@MUSD@@</div><div class="lbl">MUSD to the treasury</div></div>
+<div class="card"><div class="big">8</div><div class="lbl">routes live, 2 schemes</div></div></div>
+<ul style="margin-top:36px"><li>Every call is a MUSD transfer on explorer.test.mezo.org: a <code>transferFrom</code> with its <code>permit</code> beside it (58 calls), or a plain transfer (9).</li>
+<li>Ledger is public: <code>/payments.csv</code>. Every row re-read from the chain by <code>verify-evidence.mjs</code>: @@COUNT@@ of @@COUNT@@.</li>
+<li>Median 7.8 s per permit call end to end (56 calls timed by the client, p90 15 s), set by Mezo's 4 s blocks.</li></ul>
+<div class="foot">source: mezo.ochinimus.app/stats · @@WHEN@@</div><div class="n">4</div></section>
+
+<section class="s"><div class="k">Architecture</div><h2>A separate gateway. Production AgentFeed untouched.</h2>
+<svg viewBox="0 0 1120 330" width="1120" height="330" font-family="-apple-system,Helvetica,Arial" font-size="20">
+<defs><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#9a9aa3"/></marker></defs>
+<g fill="#171922" stroke="#2a2e3b" stroke-width="2"><rect x="0" y="110" width="200" height="110" rx="14"/><rect x="300" y="60" width="270" height="210" rx="14" stroke="#f7931a"/><rect x="690" y="0" width="430" height="110" rx="14"/><rect x="690" y="220" width="430" height="110" rx="14"/></g>
+<g fill="#ece9e4"><text x="100" y="158" text-anchor="middle" font-weight="600">AI agent</text><text x="100" y="188" text-anchor="middle" fill="#9a9aa3" font-size="17">holds MUSD only</text>
+<text x="435" y="110" text-anchor="middle" font-weight="600">agentfeed-mezo</text><text x="435" y="145" text-anchor="middle" fill="#9a9aa3" font-size="17">402 challenge · verify</text><text x="435" y="172" text-anchor="middle" fill="#9a9aa3" font-size="17">replay ledger (sqlite)</text><text x="435" y="199" text-anchor="middle" fill="#9a9aa3" font-size="17">fetch first, settle second</text><text x="435" y="245" text-anchor="middle" fill="#f7931a" font-size="17">PM2 + own tunnel</text>
+<text x="905" y="48" text-anchor="middle" font-weight="600">AgentFeed (live, 83 paid routes)</text><text x="905" y="78" text-anchor="middle" fill="#9a9aa3" font-size="17">prepaid key, half list price</text>
+<text x="905" y="268" text-anchor="middle" font-weight="600">Mezo testnet · MUSD</text><text x="905" y="298" text-anchor="middle" fill="#9a9aa3" font-size="17">permit() + transferFrom() to treasury</text></g>
+<g stroke="#9a9aa3" stroke-width="2.5" fill="none" marker-end="url(#a)"><path d="M200 150H298"/><path d="M570 120L688 70"/><path d="M570 215L688 262"/></g>
+<text x="250" y="138" text-anchor="middle" fill="#9a9aa3" font-size="16">GET + permit</text></svg>
+<div class="foot">gateway pays the gas · the agent signs once · upstream outage = payer not charged</div><div class="n">5</div></section>
+
+<section class="s"><div class="k">Why MUSD</div><h2>Built to fit the token as deployed.</h2>
+<table><tr><th>checked on-chain</th><th>result</th></tr>
+<tr><td>MUSD testnet <code>0x1189…c503</code></td><td>"Mezo USD", 18 decimals</td></tr>
+<tr><td>EIP-2612 <code>permit</code>, <code>nonces</code></td><td class="acc">present</td></tr>
+<tr><td>EIP-3009 <code>transferWithAuthorization</code></td><td>absent, so x402 "exact" is not possible</td></tr>
+<tr><td>MUSD also deployed on Base mainnet</td><td>answers at <code>0xdD46…F186</code></td></tr></table>
+<ul style="margin-top:26px"><li>Permit gives the same one-signature UX on MUSD: agent needs no gas.</li>
+<li>Depth: signature checked against MUSD's live domain and nonce, <code>permit()</code> simulated before spending gas, MUSD minted via Mezo Borrow.</li></ul>
+<div class="foot">source: mezo-org/musd deployments, eth_getCode / eth_call on rpc.test.mezo.org</div><div class="n">6</div></section>
+
+<section class="s"><div class="k">Wave 2 · Nov 2 to 15</div><h2>From a rail to a distribution surface.</h2>
+<ul>
+<li><b>Mezo mainnet MUSD:</b> same code, mainnet config, a per-call gas surcharge.</li>
+<li><b>MUSD on Base:</b> agents that live on Base pay without bridging.</li>
+<li><b>Telegram bot:</b> a person tops up a MUSD budget, sets caps, the bot signs permits for their agents. Agents never hold a key.</li>
+<li><b>Spend allowance:</b> one permit, many calls, so agents can call in parallel.</li></ul>
+<p class="mut" style="margin-top:30px;font-size:22px">Why we keep going: AgentFeed already has paying agents. MUSD is one more way for them to pay.</p>
+<div class="foot">Wave 1 → Wave 2: same repo, new surface</div><div class="n">7</div></section>
+
+<section class="s"><div class="k">Try it</div><h2>Five minutes, no wallet to start.</h2>
+<ul>
+<li><code>curl -i mezo.ochinimus.app/api/sol-price</code></li>
+<li>mezo.ochinimus.app/stats and /payments.csv, then any explorer link</li>
+<li>github.com/seekdaseek/agentfeed-mezo · README · CHECKLIST · <code>npm test</code></li></ul>
+<p style="margin-top:50px;font-size:40px" class="acc">MUSD is where Bitcoin meets agents.</p>
+<div class="foot">agentfeed-mezo · MIT</div><div class="n">8</div></section>
+</body></html>
