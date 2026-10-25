@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.*
+.secrets/
+*.db
+*.db-*
+.DS_Store
+video-work/
+BRIEF-*.md
