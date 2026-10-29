@@ -5,17 +5,22 @@
   "type": "module",
   "license": "MIT",
   "private": false,
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node --env-file=.env src/main.js",
     "test": "node --test --test-reporter=spec \"test/*.test.js\"",
     "agent": "node --env-file=.env.agent src/client.js"
   },
-  "repository": { "type": "git", "url": "git+https://github.com/seekdaseek/agentfeed-mezo.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/seekdaseek/agentfeed-mezo.git"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
     "better-sqlite3": "^12.0.0",
     "viem": "^2.21.0",
-    "zod": "^3.23.8"
+    "zod": "^4.6.7"
   }
 }

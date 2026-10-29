@@ -33,7 +33,7 @@ No wallet needed for steps 1 to 3.
    AGENT_PRIVATE_KEY=0x... node src/client.js summarize url=https://mezo.org
    ```
    The client prints the status, latency, the answer and the explorer link. `--scheme transfer` pays with a plain MUSD transfer instead of a permit.
-5. **Run the tests:** `npm test` (52 tests, no network needed).
+5. **Run the tests:** `npm test` (62 tests, no network needed).
 6. **Re-check the evidence against the chain:** `node scripts/verify-evidence.mjs` reads every row of the public ledger from Mezo testnet (receipt status, the MUSD `Transfer` from payer to treasury, the amount) and prints `verifiedOnChain` and the treasury balance.
 
 ## How it works
@@ -148,7 +148,7 @@ Optional: `PORT`, `HOST`, `MEZO_RPC_URL`, `MUSD_ADDRESS`, `UPSTREAM_URL`, `DB_PA
 
 ## Tests
 
-`npm test` runs 52 tests with Node's built-in runner: the real gateway code over a fake chain adapter and a fake AgentFeed, with real EIP-712 and EIP-191 signatures. They cover the happy path for both schemes, replay (same permit, same challenge, same tx hash, a settlement tx re-presented as a transfer), underpayment, over-payment, wrong token, wrong chain (network field and a permit signed for another chain id), wrong recipient, wrong spender, stale permit nonce, a signature by someone else, expired nonce, a nonce for another route, RPC down, AgentFeed down (clean 502, payer not charged, same payment works after recovery), settlement failure, and a concurrent double spend. Mocks are used only here; none of the paid-call evidence above is simulated.
+`npm test` runs 62 tests with Node's built-in runner. 52 run the real gateway code over a fake chain adapter and a fake AgentFeed, with real EIP-712 and EIP-191 signatures; 10 start `src/mcp.js` over stdio and drive it with the MCP SDK client against a loopback fake gateway (tool annotations, `list_routes`, `call_route` refusing a price above `MAX_PRICE_MUSD`, a wrong token or network, an unreachable gateway, bad arguments, and no array type in any tool input schema). They cover the happy path for both schemes, replay (same permit, same challenge, same tx hash, a settlement tx re-presented as a transfer), underpayment, over-payment, wrong token, wrong chain (network field and a permit signed for another chain id), wrong recipient, wrong spender, stale permit nonce, a signature by someone else, expired nonce, a nonce for another route, RPC down, AgentFeed down (clean 502, payer not charged, same payment works after recovery), settlement failure, and a concurrent double spend. Mocks are used only here; none of the paid-call evidence above is simulated.
 
 ## Status and honest limits
 
@@ -165,6 +165,12 @@ Optional: `PORT`, `HOST`, `MEZO_RPC_URL`, `MUSD_ADDRESS`, `UPSTREAM_URL`, `DB_PA
 2. **MUSD on Base.** MUSD already trades on Base, so agents that live on Base can pay without bridging. Add the Base network to the 402 `accepts`, and a read-only price check against the Base pools.
 3. **A Telegram bot that tops up and spends MUSD for agents.** A person funds a bot-held budget in MUSD, sets per-day caps, and the bot signs permits for their agents, so a trading bot or eliza agent gets data without ever holding a key. This is the Track 2 distribution surface.
 4. A `permit`-based spend allowance per agent (one signature, many calls) to remove the one-in-flight limit.
+
+## Known advisories
+
+- **zod, GHSA-mrhx-c7xc-m3w5** (high): memory exhaustion when an array schema with no length limit validates a huge array of failing elements; affected `< 4.6.6`, patched in 4.6.6. This repo was on zod 3.25.76, which a dependency scan flagged on Oct 29 2026 (the scan listed no patched version; the GitHub advisory database and `npm audit` do list 4.6.6). It now depends on **zod 4.6.7**, the current release, with `@modelcontextprotocol/sdk` 1.32.2 (its peer range is `^3.25 || ^4.0`). `npm audit --omit=dev` reports 0 vulnerabilities and all 62 tests pass on zod 4.6.7.
+- Independently of the version, the vulnerable path is not reachable from this repo's inputs: no MCP tool input schema contains an array (`list_routes` takes nothing; `call_route` takes a string, an optional string-to-string record and an enum; `test/mcp.test.js` asserts there is no `array`, `items` or `prefixItems` in either JSON schema), and the MCP server runs locally over stdio for the user's own agent. The gateway (`src/server.js`) does not import zod or the MCP SDK; it parses its own headers and query strings.
+- Not verified: the zod copy still installed in the gateway's `node_modules` on the VPS is 3.25.76. No gateway code imports it (read from the source, not tested at runtime), so it was left as is rather than redeployed.
 
 ## License
 

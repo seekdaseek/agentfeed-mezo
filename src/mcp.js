@@ -15,6 +15,8 @@ const text = (o) => ({ content: [{ type: 'text', text: typeof o === 'string' ? o
 server.registerTool('list_routes', {
   description: 'List the AgentFeed routes sold for MUSD on Mezo testnet with their prices. Free, spends nothing.',
   inputSchema: {},
+  // Reads the gateway manifest only: no state changes, same answer for the same state, talks to a remote service.
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
 }, async () => {
   const m = await (await fetch(`${baseUrl}/.well-known/x402`)).json();
   return text({ network: m.network, token: m.asset, routes: m.routes.map((r) => ({ id: r.id, price_musd: r.price_musd, params: r.params, description: r.description })) });
@@ -24,9 +26,12 @@ server.registerTool('call_route', {
   description: 'Pay for and call one AgentFeed route in MUSD (signs an EIP-2612 permit; the gateway pays the gas). Returns the data and the Mezo explorer link of the settlement. Spends MUSD from the agent wallet.',
   inputSchema: {
     route: z.string().describe('route id from list_routes, e.g. "sol-price", "liquidations", "summarize"'),
-    params: z.record(z.string()).optional().describe('query parameters, e.g. {"url":"https://example.com"} for summarize'),
+    params: z.record(z.string(), z.string()).optional().describe('query parameters, e.g. {"url":"https://example.com"} for summarize'),
     scheme: z.enum(['permit', 'transfer']).optional().describe('permit (default, no gas) or transfer (agent sends a plain MUSD transfer)'),
   },
+  // Spends MUSD from the agent wallet and calls a remote gateway. Each call is a new payment, so it is not idempotent;
+  // it moves funds but does not destroy or overwrite anything, so it is not destructive in the MCP sense.
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
 }, async ({ route, params, scheme }) => {
   try {
     const r = await agent.call(route, params || {}, { scheme: scheme || 'permit' });
