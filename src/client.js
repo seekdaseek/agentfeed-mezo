@@ -141,7 +141,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
       if (pretty) {
         console.log(`${r.ok ? 'paid' : 'refused'}  status ${r.status}  ${(r.ms / 1000).toFixed(1)} s  ${scheme}  ${r.body.paid ? `${r.body.paid.amount_musd} MUSD` : r.body.error}`);
         if (r.paid) console.log(`tx    ${r.paid.tx}\nlink  ${r.paid.url}`);
-        console.log(`data  ${preview}`);
+        console.log(r.ok ? `data  ${preview}` : `why   ${r.body.message || preview}`);
       } else console.log(JSON.stringify({ i: i + 1, route, scheme, status: r.status, ms: r.ms, tx: r.paid?.tx, explorer: r.paid?.url, error: r.ok ? undefined : r.body.error, preview }));
     } catch (e) { console.log(JSON.stringify({ i: i + 1, route, scheme, error: e.message })); }
     if (gap) await new Promise((r) => setTimeout(r, gap));
