@@ -13,8 +13,8 @@ export const ROUTES = [
   { id: 'summarize', upstream: '/api/summarize', cents: 5, params: { url: 'string!', length: 'string' }, title: 'Summarize a web page', description: 'Fixed-purpose language task: summarize the page at ?url=. Optional length.' },
 ];
 
-export const priceWei = (route) => BigInt(route.cents) * CENT;
-export const priceMusd = (route) => (route.cents / 100).toFixed(2);
+export const priceWei = (route, surchargeCents = 0) => BigInt(route.cents + surchargeCents) * CENT;
+export const priceMusd = (route, surchargeCents = 0) => ((route.cents + surchargeCents) / 100).toFixed(2);
 export const findRoute = (id) => ROUTES.find((r) => r.id === id);
 
 // Keep only declared params; reject a missing required one. Returns { ok, query } or { ok:false, error }.

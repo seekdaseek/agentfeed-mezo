@@ -2,7 +2,7 @@
 import { createPublicClient, createWalletClient, http, parseAbi, getAddress } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { pathToFileURL } from 'node:url';
-import { MEZO_TESTNET, MUSD } from './config.js';
+import { MEZO_TESTNET, MUSD, NETWORK_DEFS } from './config.js';
 import { mezoChain } from './chain.js';
 import { PERMIT_TYPES, claimMessage } from './payments.js';
 
@@ -10,13 +10,19 @@ const abi = parseAbi(['function nonces(address) view returns (uint256)', 'functi
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64');
 const unb64 = (s) => JSON.parse(Buffer.from(s, 'base64').toString('utf8'));
 
+// networkKey is one of mezo-testnet (default), mezo-mainnet, base; it fixes the chain, the token the agent will sign for,
+// the RPC it reads its permit nonce from and the explorer it links. Explicit rpcUrl, token, network, explorer still win.
 export function createAgent({
-  privateKey, baseUrl = 'https://mezo.ochinimus.app', rpcUrl = MEZO_TESTNET.rpcUrl, fetchImpl = fetch,
-  maxPriceMusd = 0.1, token = MUSD.address, network = MEZO_TESTNET.network, explorer = MEZO_TESTNET.explorer,
+  privateKey, baseUrl = 'https://mezo.ochinimus.app', networkKey = 'mezo-testnet', fetchImpl = fetch, maxPriceMusd = 0.1,
+  rpcUrl = (NETWORK_DEFS[networkKey] || {}).rpcUrls?.[0] ?? MEZO_TESTNET.rpcUrl,
+  token = (NETWORK_DEFS[networkKey] || {}).asset?.address ?? MUSD.address,
+  network = (NETWORK_DEFS[networkKey] || {}).network ?? MEZO_TESTNET.network,
+  explorer = (NETWORK_DEFS[networkKey] || {}).explorer ?? MEZO_TESTNET.explorer,
 }) {
+  if (!NETWORK_DEFS[networkKey]) throw new Error(`unknown network ${networkKey}; known: ${Object.keys(NETWORK_DEFS).join(', ')}`);
   const account = privateKeyToAccount(privateKey);
   const chainId = Number(network.split(':')[1]);
-  const chain = mezoChain(chainId, rpcUrl);
+  const chain = mezoChain(chainId, rpcUrl, NETWORK_DEFS[networkKey].label);
   const pub = createPublicClient({ chain, transport: http(rpcUrl) });
   const wallet = createWalletClient({ account, chain, transport: http(rpcUrl) });
   baseUrl = baseUrl.replace(/\/$/, "");
@@ -49,7 +55,8 @@ export function createAgent({
       return { ok: first.ok, status: first.status, body, ms: Date.now() - t0, paid: null };
     }
     const challenge = await readChallenge(first);
-    const accept = challenge.accepts.find((a) => a.scheme === scheme);
+    // pick this agent's network; if the gateway offers none, take the first of the scheme and let guard() refuse it by name
+    const accept = challenge.accepts.find((a) => a.scheme === scheme && a.network === network) || challenge.accepts.find((a) => a.scheme === scheme);
     if (!accept) throw new Error(`gateway offers no "${scheme}" scheme`);
     guard(accept);
     const owner = account.address;
@@ -92,6 +99,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const args = process.argv.slice(2);
   const flag = (n, d) => { const i = args.indexOf(n); if (i < 0) return d; const v = args[i + 1]; args.splice(i, 2); return v; };
   const scheme = flag('--scheme', 'permit');
+  const networkKey = flag('--network', process.env.NETWORK || 'mezo-testnet');
   const n = Number(flag('--n', '1'));
   const gap = Number(flag('--gap-ms', '0'));
   const pretty = args.includes('--pretty') ? (args.splice(args.indexOf('--pretty'), 1), true) : false;
@@ -101,7 +109,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
     process.exit(2);
   }
   const params = Object.fromEntries(kv.map((x) => x.split(/=(.*)/s).slice(0, 2)));
-  const agent = createAgent({ privateKey: process.env.AGENT_PRIVATE_KEY, baseUrl: process.env.GATEWAY_URL || undefined, maxPriceMusd: Number(process.env.MAX_PRICE_MUSD || 0.1) });
+  const agent = createAgent({ privateKey: process.env.AGENT_PRIVATE_KEY, networkKey, baseUrl: process.env.GATEWAY_URL || undefined, maxPriceMusd: Number(process.env.MAX_PRICE_MUSD || 0.1) });
   let okCount = 0;
   for (let i = 0; i < n; i++) {
     try {

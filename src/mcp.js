@@ -7,7 +7,7 @@ import { createAgent } from './client.js';
 
 const baseUrl = (process.env.GATEWAY_URL || 'https://mezo.ochinimus.app').replace(/\/$/, '');
 if (!process.env.AGENT_PRIVATE_KEY) { console.error('AGENT_PRIVATE_KEY is required'); process.exit(2); }
-const agent = createAgent({ privateKey: process.env.AGENT_PRIVATE_KEY, baseUrl, maxPriceMusd: Number(process.env.MAX_PRICE_MUSD || 0.1) });
+const agent = createAgent({ privateKey: process.env.AGENT_PRIVATE_KEY, networkKey: process.env.NETWORK || 'mezo-testnet', baseUrl, maxPriceMusd: Number(process.env.MAX_PRICE_MUSD || 0.1) });
 
 const server = new McpServer({ name: 'agentfeed-mezo', version: '0.1.0' });
 const text = (o) => ({ content: [{ type: 'text', text: typeof o === 'string' ? o : JSON.stringify(o, null, 2) }] });

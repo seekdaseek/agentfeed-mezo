@@ -37,7 +37,7 @@ export function splitSignature(sig) {
 }
 
 // Checks shared by both schemes: network, token, recipient, echoed amount, challenge nonce.
-export function checkEnvelope({ cfg, route, price, payment, now }) {
+export function checkEnvelope({ cfg, route, price, payment, now, nonceRoute }) {
   if (!payment || typeof payment !== 'object') return fail('malformed_payment', 'payment header is not a JSON object');
   if (payment.scheme !== 'permit' && payment.scheme !== 'transfer') return fail('unsupported_scheme', 'scheme must be "permit" or "transfer"');
   if (payment.network !== cfg.network) return fail('wrong_network', `this gateway settles on ${cfg.network} (Mezo testnet), not ${payment.network}`);
@@ -48,7 +48,7 @@ export function checkEnvelope({ cfg, route, price, payment, now }) {
     if (a == null) return fail('malformed_payment', 'amount is not an integer');
     if (a < price) return fail('underpaid', `price is ${price} wei MUSD, payment declares ${a}`);
   }
-  const n = checkNonce({ secret: cfg.challengeSecret, nonce: payment.nonce, routeId: route.id, amountWei: price, now });
+  const n = checkNonce({ secret: cfg.challengeSecret, nonce: payment.nonce, routeId: nonceRoute ?? route.id, amountWei: price, now });
   if (!n.ok) return fail(n.code, n.code === 'nonce_expired' ? 'challenge expired, request a new 402' : 'nonce does not match this route and price');
   return { ok: true, issuedAt: n.issuedAt, expiresAt: n.expiresAt };
 }
@@ -73,7 +73,7 @@ export async function verifyPermit({ cfg, chain, store, price, payment, env, now
   if (keys.some((k) => store.isUsed(k))) return fail('payment_replayed', 'this signature or challenge was already used');
 
   const permitNonce = await chain.permitNonce(owner);
-  keys.push(`pn:${owner.toLowerCase()}:${permitNonce}`);
+  keys.push(`pn:${cfg.keyPrefix || ''}${owner.toLowerCase()}:${permitNonce}`);
   if (store.isUsed(keys[2])) return fail('payment_replayed', 'this permit nonce was already settled');
 
   let recovered;
@@ -91,7 +91,7 @@ export async function verifyPermit({ cfg, chain, store, price, payment, env, now
     await chain.simulatePermit({ owner, spender: chain.settlerAddress, value, deadline, ...sig });
   } catch (e) { return fail('permit_rejected', `MUSD.permit would revert: ${e.shortMessage || e.message}`); }
 
-  return { ok: true, keys, owner, value, deadline, ...sig, lockKey: owner.toLowerCase() };
+  return { ok: true, keys, owner, value, deadline, ...sig, lockKey: `${cfg.keyPrefix || ''}${owner.toLowerCase()}` };
 }
 
 const topicAddr = (t) => `0x${t.slice(26)}`;
@@ -103,7 +103,7 @@ export const claimMessage = (nonce, txHash) => `AgentFeed-Mezo claim\nnonce:${no
 export async function verifyTransfer({ cfg, chain, store, price, payment, env }) {
   const hash = payment.payload?.txHash;
   if (!/^0x[0-9a-fA-F]{64}$/.test(hash || '')) return fail('malformed_payment', 'payload.txHash must be a 32-byte hex hash');
-  const keys = [`tx:${hash.toLowerCase()}`, `ch:${payment.nonce}`];
+  const keys = [`tx:${cfg.keyPrefix || ''}${hash.toLowerCase()}`, `ch:${payment.nonce}`];
   if (keys.some((k) => store.isUsed(k))) return fail('payment_replayed', 'this tx hash or challenge was already used');
 
   const rc = await chain.transferReceipt(hash);

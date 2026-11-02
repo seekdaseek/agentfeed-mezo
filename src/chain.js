@@ -1,5 +1,5 @@
 // The only module that talks to the Mezo RPC. server.js depends on this interface, so tests inject a fake.
-import { createPublicClient, createWalletClient, http, defineChain, parseAbi, getAddress } from 'viem';
+import { createPublicClient, createWalletClient, http, fallback, defineChain, parseAbi, getAddress } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 
 export const MUSD_ABI = parseAbi([
@@ -13,20 +13,24 @@ export const MUSD_ABI = parseAbi([
 
 export const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 
-export const mezoChain = (id, rpcUrl) =>
+export const mezoChain = (id, rpcUrl, name = 'Mezo Testnet') =>
   defineChain({
     id,
-    name: 'Mezo Testnet',
-    nativeCurrency: { name: 'Bitcoin', symbol: 'BTC', decimals: 18 },
+    name,
+    nativeCurrency: id === 8453 ? { name: 'Ether', symbol: 'ETH', decimals: 18 } : { name: 'Bitcoin', symbol: 'BTC', decimals: 18 },
     rpcUrls: { default: { http: [rpcUrl] } },
   });
 
+// cfg is one network entry of loadConfig().networks (or the Wave 1 top-level config): chainId, rpcUrls or rpcUrl, asset or
+// musd, settlerKey. More than one RPC URL becomes a fallback transport, because a single public RPC answers from several nodes.
 export function makeChain(cfg) {
-  const chain = mezoChain(cfg.chainId, cfg.rpcUrl);
-  const pub = createPublicClient({ chain, transport: http(cfg.rpcUrl, { retryCount: 2 }) });
+  const urls = cfg.rpcUrls || [cfg.rpcUrl];
+  const chain = mezoChain(cfg.chainId, urls[0], cfg.label || 'Mezo Testnet');
+  const transport = (retry) => (urls.length > 1 ? fallback(urls.map((u) => http(u, { retryCount: 1 })), { rank: false }) : http(urls[0], { retryCount: retry }));
+  const pub = createPublicClient({ chain, transport: transport(2) });
   const settler = privateKeyToAccount(cfg.settlerKey);
-  const wallet = createWalletClient({ account: settler, chain, transport: http(cfg.rpcUrl) });
-  const token = getAddress(cfg.musd.address);
+  const wallet = createWalletClient({ account: settler, chain, transport: transport(0) });
+  const token = getAddress((cfg.asset || cfg.musd).address);
   let sendQueue = Promise.resolve(); // serialises nonce assignment; receipts are awaited outside the queue
 
   return {

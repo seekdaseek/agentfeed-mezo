@@ -15,6 +15,8 @@ export function openStore(path) {
     );
     CREATE INDEX IF NOT EXISTS payments_ts ON payments(ts);
   `);
+  // Wave 2: the ledger is per network. Rows written before the column existed are Mezo testnet payments.
+  try { db.exec("ALTER TABLE payments ADD COLUMN network TEXT NOT NULL DEFAULT 'eip155:31611'"); } catch { /* column already there */ }
   db.prepare("DELETE FROM replay WHERE state = 'pending'").run(); // a crash mid-call leaves nothing charged
 
   const sel = db.prepare('SELECT state FROM replay WHERE key = ?');
@@ -36,18 +38,20 @@ export function openStore(path) {
     release: (keys) => keys.forEach((k) => del.run(k)),
     commit: db.transaction((keys, p) => {
       keys.forEach((k) => use.run(k));
-      db.prepare(`INSERT INTO payments (ts, route, scheme, payer, amount_wei, nonce, permit_tx, tx_hash, upstream_ms, total_ms)
-                  VALUES (@ts, @route, @scheme, @payer, @amount_wei, @nonce, @permit_tx, @tx_hash, @upstream_ms, @total_ms)`).run(p);
+      db.prepare(`INSERT INTO payments (ts, route, scheme, payer, amount_wei, nonce, permit_tx, tx_hash, upstream_ms, total_ms, network)
+                  VALUES (@ts, @route, @scheme, @payer, @amount_wei, @nonce, @permit_tx, @tx_hash, @upstream_ms, @total_ms, @network)`).run({ network: 'eip155:31611', ...p });
     }),
     isUsed: (key) => !!sel.get(key),
     stats() {
-      const rows = db.prepare('SELECT amount_wei FROM payments').all();
+      const rows = db.prepare('SELECT amount_wei, network, payer FROM payments').all();
       const t = { n: rows.length, wei: rows.reduce((a, r) => a + BigInt(r.amount_wei), 0n) };
+      const byNet = {};
+      for (const r of rows) { const x = (byNet[r.network] ||= { n: 0, wei: 0n, payers: new Set() }); x.n++; x.wei += BigInt(r.amount_wei); x.payers.add(r.payer.toLowerCase()); }
       const byRoute = db.prepare('SELECT route, COUNT(*) n FROM payments GROUP BY route ORDER BY n DESC').all();
       const byScheme = db.prepare('SELECT scheme, COUNT(*) n FROM payments GROUP BY scheme').all();
       const payers = db.prepare('SELECT COUNT(DISTINCT payer) n FROM payments').get().n;
       const day = db.prepare('SELECT COUNT(*) n FROM payments WHERE ts > ?').get(Math.floor(Date.now() / 1000) - 86400).n;
-      return { settled: t.n, musdWei: t.wei, byRoute, byScheme, payers, last24h: day };
+      return { settled: t.n, musdWei: t.wei, byRoute, byScheme, payers, last24h: day, byNet };
     },
     recent: (limit = 20) => db.prepare('SELECT * FROM payments ORDER BY id DESC LIMIT ?').all(limit),
     all: () => db.prepare('SELECT * FROM payments ORDER BY id ASC').all(),

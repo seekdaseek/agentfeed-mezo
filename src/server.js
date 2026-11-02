@@ -1,9 +1,10 @@
-// agentfeed-mezo gateway: HTTP 402 in front of AgentFeed, settled in MUSD on Mezo testnet.
+// agentfeed-mezo gateway: HTTP 402 in front of AgentFeed, settled in MUSD on Mezo (testnet and mainnet) and Base.
 import http from 'node:http';
 import { ROUTES, findRoute, priceWei, priceMusd, cleanParams } from './routes.js';
 import { makeNonce } from './challenge.js';
 import { checkEnvelope, verifyPermit, verifyTransfer } from './payments.js';
 import { landingHtml } from './landing.js';
+import { openAgents } from './agents.js';
 
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64');
 const fromB64 = (s) => JSON.parse(Buffer.from(s, 'base64').toString('utf8'));
@@ -16,27 +17,42 @@ const STATUS = {
   malformed_payment: 400, unsupported_scheme: 400, payment_in_flight: 429,
 };
 
-export function createGateway({ cfg, chain, store, fetchImpl = fetch, now = () => Math.floor(Date.now() / 1000) }) {
+export function createGateway({ cfg, chain, chains, store, fetchImpl = fetch, now = () => Math.floor(Date.now() / 1000) }) {
+  // One entry per network the gateway sells on. Wave 1 callers pass a single `chain` and no cfg.networks: that is one
+  // Mezo testnet entry built from the top-level config.
+  const nets = cfg.networks || [{ key: 'mezo-testnet', network: cfg.network, chainId: cfg.chainId, label: 'Mezo testnet', explorer: cfg.explorer,
+    asset: cfg.musd, treasury: cfg.treasury, confirmations: cfg.confirmations, surchargeCents: 0, keyPrefix: '', mainnet: false }];
+  const chainFor = (net) => (chains && chains[net.network]) || chain;
+  const netCfg = (net) => ({ ...cfg, network: net.network, chainId: net.chainId, musd: net.asset, treasury: net.treasury, confirmations: net.confirmations, explorer: net.explorer, keyPrefix: net.keyPrefix || '' });
+  const netOf = (network) => nets.find((n) => n.network === network);
+  const agents = openAgents(store.db);
   const inflight = new Set();
   const hits = new Map(); // ip -> [count, windowStart]
   let upstreamDay = { day: '', n: 0 };
 
-  const tx = (h) => `${cfg.explorer}/tx/${h}`;
+  const tx = (h, net = nets[0]) => `${net.explorer}/tx/${h}`;
+  const own = new Set(cfg.ownWallets || []);
   const requirements = (route, code, message) => {
-    const amount = priceWei(route);
-    const nonce = makeNonce({ secret: cfg.challengeSecret, routeId: route.id, amountWei: amount, now: now(), ttl: cfg.challengeTtlSec });
+    const first = nets[0];
+    const amount = priceWei(route, first.surchargeCents);
     const expiresAt = now() + cfg.challengeTtlSec;
-    const base = { network: cfg.network, asset: cfg.musd.address, amount: String(amount), payTo: cfg.treasury, maxTimeoutSeconds: cfg.challengeTtlSec };
+    const accepts = nets.flatMap((net) => {
+      const price = priceWei(route, net.surchargeCents);
+      const nonce = makeNonce({ secret: cfg.challengeSecret, routeId: `${route.id}@${net.network}`, amountWei: price, now: now(), ttl: cfg.challengeTtlSec });
+      const base = { network: net.network, asset: net.asset.address, amount: String(price), payTo: net.treasury, maxTimeoutSeconds: cfg.challengeTtlSec };
+      const label = { networkLabel: net.label, priceMusd: priceMusd(route, net.surchargeCents), mainnet: net.mainnet };
+      return [
+        { scheme: 'permit', ...base, extra: { standard: 'EIP-2612', name: net.asset.name, version: net.asset.version, symbol: net.asset.symbol, decimals: net.asset.decimals, spender: chainFor(net).settlerAddress, nonce, expiresAt, gasPaidBy: 'gateway', ...label } },
+        { scheme: 'transfer', ...base, extra: { standard: 'ERC-20 transfer', nonce, expiresAt, confirmations: net.confirmations, claim: 'sign personal_message "AgentFeed-Mezo claim\\nnonce:<nonce>\\ntx:<hash lowercase>" with the sender key', gasPaidBy: 'agent', ...label } },
+      ];
+    });
     return {
       x402Version: 2,
       error: code || 'payment_required',
-      message: message || `${priceMusd(route)} MUSD on Mezo testnet`,
+      message: message || `${priceMusd(route, first.surchargeCents)} MUSD on ${first.label}`,
       resource: { url: `${cfg.publicUrl}/api/${route.id}`, description: route.description, mimeType: 'application/json' },
-      price: { amount: priceMusd(route), currency: 'MUSD', wei: String(amount) },
-      accepts: [
-        { scheme: 'permit', ...base, extra: { standard: 'EIP-2612', name: cfg.musd.name, version: cfg.musd.version, symbol: cfg.musd.symbol, decimals: cfg.musd.decimals, spender: chain.settlerAddress, nonce, expiresAt, gasPaidBy: 'gateway' } },
-        { scheme: 'transfer', ...base, extra: { standard: 'ERC-20 transfer', nonce, expiresAt, confirmations: cfg.confirmations, claim: 'sign personal_message "AgentFeed-Mezo claim\\nnonce:<nonce>\\ntx:<hash lowercase>" with the sender key', gasPaidBy: 'agent' } },
-      ],
+      price: { amount: priceMusd(route, first.surchargeCents), currency: 'MUSD', wei: String(amount) },
+      accepts,
     };
   };
 
@@ -53,22 +69,26 @@ export function createGateway({ cfg, chain, store, fetchImpl = fetch, now = () =
 
   const manifest = () => ({
     name: 'agentfeed-mezo',
-    description: 'AgentFeed market data for AI agents, paid per call in MUSD on Mezo testnet (chain 31611).',
+    description: `AgentFeed market data for AI agents, paid per call in MUSD on ${nets.map((n) => n.label).join(', ')}.`,
     x402Version: 2,
-    network: cfg.network,
-    asset: { address: cfg.musd.address, symbol: 'MUSD', decimals: cfg.musd.decimals, standard: 'ERC-20 + EIP-2612 permit' },
-    treasury: cfg.treasury,
-    settler: chain.settlerAddress,
+    // the first network keeps the Wave 1 top-level fields; every network is listed in `networks`
+    network: nets[0].network,
+    asset: { address: nets[0].asset.address, symbol: 'MUSD', decimals: nets[0].asset.decimals, standard: 'ERC-20 + EIP-2612 permit' },
+    treasury: nets[0].treasury,
+    settler: chainFor(nets[0]).settlerAddress,
+    networks: nets.map((n) => ({ key: n.key, network: n.network, chainId: n.chainId, label: n.label, mainnet: n.mainnet, asset: { address: n.asset.address, symbol: n.asset.symbol, decimals: n.asset.decimals, name: n.asset.name, version: n.asset.version }, treasury: n.treasury, settler: chainFor(n).settlerAddress, explorer: n.explorer, gas_surcharge_cents: n.surchargeCents })),
     schemes: ['permit', 'transfer'],
-    explorer: cfg.explorer,
+    explorer: nets[0].explorer,
     upstream: 'https://x402.ochinimus.app',
-    routes: ROUTES.map((r) => ({ id: r.id, method: 'GET', path: `/api/${r.id}`, url: `${cfg.publicUrl}/api/${r.id}`, price_musd: priceMusd(r), price_wei: String(priceWei(r)), params: r.params, title: r.title, description: r.description })),
+    routes: ROUTES.map((r) => ({ id: r.id, method: 'GET', path: `/api/${r.id}`, url: `${cfg.publicUrl}/api/${r.id}`, price_musd: priceMusd(r, nets[0].surchargeCents), price_wei: String(priceWei(r, nets[0].surchargeCents)),
+      prices: Object.fromEntries(nets.map((n) => [n.network, { musd: priceMusd(r, n.surchargeCents), wei: String(priceWei(r, n.surchargeCents)) }])), params: r.params, title: r.title, description: r.description })),
     source: 'https://github.com/seekdaseek/agentfeed-mezo',
   });
 
   const csv = () => {
-    const head = 'timestamp_utc,route,scheme,payer,amount_musd,transfer_tx,permit_tx,transfer_tx_url';
-    const rows = store.all().map((p) => [new Date(p.ts * 1000).toISOString(), p.route, p.scheme, p.payer, musdStr(p.amount_wei), p.tx_hash, p.permit_tx || '', tx(p.tx_hash)].join(','));
+    // network is the last column so Wave 1 readers that index columns keep working
+    const head = 'timestamp_utc,route,scheme,payer,amount_musd,transfer_tx,permit_tx,transfer_tx_url,network';
+    const rows = store.all().map((p) => [new Date(p.ts * 1000).toISOString(), p.route, p.scheme, p.payer, musdStr(p.amount_wei), p.tx_hash, p.permit_tx || '', tx(p.tx_hash, netOf(p.network) || nets[0]), p.network].join(','));
     return [head, ...rows].join('\n') + '\n';
   };
 
@@ -100,16 +120,28 @@ export function createGateway({ cfg, chain, store, fetchImpl = fetch, now = () =
 
     let payment;
     try { payment = fromB64(raw); } catch { return send402(res, route, 'malformed_payment', 'payment header is not base64 JSON'); }
-    const price = priceWei(route);
+    const net = netOf(payment && payment.network);
+    if (!net) return send402(res, route, 'wrong_network', `this gateway settles on ${nets.map((n) => `${n.network} (${n.label})`).join(', ')}, not ${payment && payment.network}`);
+    const cfgN = netCfg(net);
+    const chainN = chainFor(net);
+    const price = priceWei(route, net.surchargeCents);
     const t = now();
-    const env = checkEnvelope({ cfg, route, price, payment, now: t });
+    const env = checkEnvelope({ cfg: cfgN, route, price, payment, now: t, nonceRoute: `${route.id}@${net.network}` });
     if (!env.ok) return send402(res, route, env.code, env.message);
 
+    const rpcErr = (e) => ({ ok: false, code: 'chain_unavailable', message: `${net.label} RPC error: ${e.shortMessage || e.message}` });
     const v = payment.scheme === 'permit'
-      ? await verifyPermit({ cfg, chain, store, price, payment, env, now: t }).catch((e) => ({ ok: false, code: 'chain_unavailable', message: `Mezo RPC error: ${e.shortMessage || e.message}` }))
-      : await verifyTransfer({ cfg, chain, store, price, payment, env }).catch((e) => ({ ok: false, code: 'chain_unavailable', message: `Mezo RPC error: ${e.shortMessage || e.message}` }));
+      ? await verifyPermit({ cfg: cfgN, chain: chainN, store, price, payment, env, now: t }).catch(rpcErr)
+      : await verifyTransfer({ cfg: cfgN, chain: chainN, store, price, payment, env }).catch(rpcErr);
     if (!v.ok) return send402(res, route, v.code, v.message);
 
+    // A registered agent wallet is held to its owner's budget, daily cap and pause/revoke, before anything is fetched or settled.
+    const agent = agents.byAddress(v.owner);
+    if (agent) {
+      const gate = agents.check(agent, price, t);
+      if (!gate.ok) return send402(res, route, gate.code, `${gate.message}; nothing was charged`);
+      v.lockKey = `agent:${agent.id}`; // one call at a time per agent across networks, so two networks cannot race one budget
+    }
     // One in-flight permit per owner: stops a payer racing many signatures against one on-chain nonce.
     if (v.lockKey) {
       if (inflight.has(v.lockKey)) return send(res, 429, { error: 'payment_in_flight', message: 'one paid call at a time per owner address' }, { 'retry-after': '5' });
@@ -130,7 +162,7 @@ export function createGateway({ cfg, chain, store, fetchImpl = fetch, now = () =
       let permitTx = null; let transferTx;
       if (payment.scheme === 'permit') {
         try {
-          const s = await chain.settlePermit({ owner: v.owner, spender: chain.settlerAddress, value: v.value, deadline: v.deadline, v: v.v, r: v.r, s: v.s, to: cfg.treasury, amount: price });
+          const s = await chainN.settlePermit({ owner: v.owner, spender: chainN.settlerAddress, value: v.value, deadline: v.deadline, v: v.v, r: v.r, s: v.s, to: net.treasury, amount: price });
           permitTx = s.permitTx; transferTx = s.transferTx;
         } catch (e) {
           store.release(v.keys); reserved = false;
@@ -138,15 +170,16 @@ export function createGateway({ cfg, chain, store, fetchImpl = fetch, now = () =
         }
       } else { transferTx = v.txHash; }
 
-      const keys = [...v.keys, `tx:${transferTx.toLowerCase()}`, ...(permitTx ? [`tx:${permitTx.toLowerCase()}`] : [])];
+      const kp = net.keyPrefix || '';
+      const keys = [...v.keys, `tx:${kp}${transferTx.toLowerCase()}`, ...(permitTx ? [`tx:${kp}${permitTx.toLowerCase()}`] : [])];
       if (keys.length > v.keys.length) { for (const k of keys.slice(v.keys.length)) { if (!store.isUsed(k)) store.reserve([k]); } }
-      store.commit(keys, { ts: now(), route: route.id, scheme: payment.scheme, payer: v.owner, amount_wei: String(price), nonce: payment.nonce, permit_tx: permitTx, tx_hash: transferTx, upstream_ms: up.ms, total_ms: Date.now() - t0 });
+      store.commit(keys, { ts: now(), route: route.id, scheme: payment.scheme, payer: v.owner, amount_wei: String(price), nonce: payment.nonce, permit_tx: permitTx, tx_hash: transferTx, upstream_ms: up.ms, total_ms: Date.now() - t0, network: net.network });
       reserved = false;
 
-      const receipt = { success: true, network: cfg.network, scheme: payment.scheme, payer: v.owner, amount: String(price), transaction: transferTx, ...(permitTx ? { permitTransaction: permitTx } : {}) };
+      const receipt = { success: true, network: net.network, scheme: payment.scheme, payer: v.owner, amount: String(price), transaction: transferTx, ...(permitTx ? { permitTransaction: permitTx } : {}) };
       return send(res, 200, {
         route: route.id,
-        paid: { amount_musd: priceMusd(route), currency: 'MUSD', network: cfg.network, payer: v.owner, scheme: payment.scheme, tx: transferTx, explorer: tx(transferTx), ...(permitTx ? { permit_tx: permitTx } : {}) },
+        paid: { amount_musd: priceMusd(route, net.surchargeCents), currency: 'MUSD', network: net.network, network_label: net.label, mainnet: net.mainnet, payer: v.owner, scheme: payment.scheme, tx: transferTx, explorer: tx(transferTx, net), ...(permitTx ? { permit_tx: permitTx } : {}) },
         data: up.json,
       }, { 'payment-response': b64(receipt) });
     } finally {
@@ -175,12 +208,27 @@ export function createGateway({ cfg, chain, store, fetchImpl = fetch, now = () =
         return await paid(req, res, route, url);
       }
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'method_not_allowed' }, { allow: 'GET, HEAD' });
-      if (p === '/') return send(res, 200, landingHtml({ cfg, routes: ROUTES, priceMusd, settler: chain.settlerAddress }));
-      if (p === '/health') return send(res, 200, { ok: true, network: cfg.network, settled: store.stats().settled });
+      if (p === '/') return send(res, 200, landingHtml({ cfg, nets, routes: ROUTES, priceMusd, settler: chainFor(nets[0]).settlerAddress, settlerOf: (n) => chainFor(n).settlerAddress }));
+      if (p === '/health') return send(res, 200, { ok: true, network: nets[0].network, networks: nets.map((n) => n.network), settled: store.stats().settled });
       if (p === '/.well-known/x402' || p === '/.well-known/agentfeed-mezo.json' || p === '/manifest.json') return send(res, 200, manifest());
       if (p === '/stats') {
         const s = store.stats();
-        return send(res, 200, { settled_calls: s.settled, musd_settled: musdStr(s.musdWei), distinct_payers: s.payers, last_24h: s.last24h, by_route: s.byRoute, by_scheme: s.byScheme, recent: store.recent(10).map((x) => ({ ts: x.ts, route: x.route, scheme: x.scheme, payer: x.payer, amount_musd: musdStr(x.amount_wei), tx: x.tx_hash, explorer: tx(x.tx_hash) })) });
+        // Rule: one headline number (settled_calls, musd_settled); outside payers are counted apart from our own wallets.
+        const per = nets.map((n) => {
+          const x = s.byNet[n.network] || { n: 0, wei: 0n, payers: new Set() };
+          const outside = [...x.payers].filter((a) => !own.has(a));
+          return { network: n.network, label: n.label, mainnet: n.mainnet, settled_calls: x.n, musd_settled: musdStr(x.wei), distinct_payers: x.payers.size, outside_payers: outside.length };
+        });
+        const all = Object.values(s.byNet).flatMap((x) => [...x.payers]);
+        const outsideAll = new Set(all.filter((a) => !own.has(a)));
+        return send(res, 200, { settled_calls: s.settled, musd_settled: musdStr(s.musdWei), distinct_payers: s.payers, outside_payers: outsideAll.size, last_24h: s.last24h, by_network: per, by_route: s.byRoute, by_scheme: s.byScheme,
+          recent: store.recent(10).map((x) => ({ ts: x.ts, network: x.network, route: x.route, scheme: x.scheme, payer: x.payer, amount_musd: musdStr(x.amount_wei), tx: x.tx_hash, explorer: tx(x.tx_hash, netOf(x.network) || nets[0]) })) });
+      }
+      if (p.startsWith('/agents/') && /^\/agents\/0x[0-9a-fA-F]{40}$/.test(p)) {
+        const a = agents.byAddress(p.slice(8));
+        if (!a) return send(res, 200, { registered: false });
+        const st = agents.state(a, now());
+        return send(res, 200, { registered: true, name: a.name, status: a.status, remaining_musd: musdStr(st.remaining), daily_remaining_musd: musdStr(st.dailyRemaining), daily_cap_musd: musdStr(st.dailyCap), resets_at: new Date(st.resetsAt * 1000).toISOString() });
       }
       if (p === '/payments.csv') return send(res, 200, csv(), { 'content-type': 'text/csv; charset=utf-8' });
       return send(res, 404, { error: 'not_found', see: '/.well-known/x402' });
