@@ -2,3 +2,6 @@ network,kind,tx,what,gas_used,gas_eth
 eip155:8453,approve,0x6698705fa5744bbdfbf27a793a910be090e46d9d76cc881efcce9176ec418934,base-agent approves 0.90 USDC to the PancakeSwap V3 SmartRouter (recovered from the Approval event: block 53409010),55437,
 eip155:8453,swap,0x3ea3a03ddba8783af11855fc86cf69db088d18f578926d149c40370240798e78,0.90 USDC to 0.908797545 MUSD on PancakeSwap V3 USDC/MUSD 0.01% (block 53409014),165550,
 eip155:8453,recycle,0x357a13c31426d3ffab6eb127183a7643f7e0ce3d827fe0fa83b26ddae78a0d75,treasury-hot sends 0.9 MUSD to base-agent,29785,0.000000179169
+eip155:31611,draw-1,0xf60c3f77f9f450ccc4b4ba2cffd82af520e865ed6f49825e31243a56b634e568,withdrawMUSDWithSignature: 50 MUSD minted to the demo agent from the testnet trove (mined; the bot first said it failed; credited later with /confirm),750000,
+eip155:31611,draw-2,0x9bcd592c3acffa27899d827a6e0e523cf24a86fc86c87af87365dacce1b7d06d,withdrawMUSDWithSignature: 50 MUSD minted to the demo agent; trove 156% to 153%; budget credited by the bot,,
+eip155:31611,agent-call,0x2af1ae19e306f6d5ac3861167ea703defa6f988cee096f3caccb41324218a44c,the demo agent pays 0.02 MUSD for liquidations from the drawn MUSD (also in paid-calls.csv),,
