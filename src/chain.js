@@ -23,6 +23,31 @@ export const mezoChain = (id, rpcUrl, name = 'Mezo Testnet') =>
 
 // cfg is one network entry of loadConfig().networks (or the Wave 1 top-level config): chainId, rpcUrls or rpcUrl, asset or
 // musd, settlerKey. More than one RPC URL becomes a fallback transport, because a single public RPC answers from several nodes.
+// Read-only view of one network (no key, no wallet): what the Telegram bot needs to check a top-up transaction or read a trove.
+export function makeReader(cfg) {
+  const urls = cfg.rpcUrls || [cfg.rpcUrl];
+  const chain = mezoChain(cfg.chainId, urls[0], cfg.label || 'Mezo Testnet');
+  const pub = createPublicClient({ chain, transport: urls.length > 1 ? fallback(urls.map((u) => http(u, { retryCount: 1 })), { rank: false }) : http(urls[0], { retryCount: 2 }) });
+  return { pub, transferReceipt: (hash) => receiptOf(pub, hash) };
+}
+
+// The public RPC is several nodes that index at different speeds: give a fresh receipt a few seconds to appear.
+async function receiptOf(pub, hash) {
+  let r = null;
+  for (let i = 0; i < 8 && !r; i++) {
+    try { r = await pub.getTransactionReceipt({ hash }); } catch { if (i < 7) await new Promise((res) => setTimeout(res, 1000)); }
+  }
+  if (!r) return null;
+  const [block, head] = await Promise.all([pub.getBlock({ blockNumber: r.blockNumber }), pub.getBlockNumber()]);
+  return {
+    status: r.status,
+    from: r.from,
+    confirmations: Number(head - r.blockNumber) + 1,
+    timestamp: Number(block.timestamp),
+    logs: r.logs.map((l) => ({ address: l.address, topics: l.topics, data: l.data })),
+  };
+}
+
 export function makeChain(cfg) {
   const urls = cfg.rpcUrls || [cfg.rpcUrl];
   const chain = mezoChain(cfg.chainId, urls[0], cfg.label || 'Mezo Testnet');
@@ -75,21 +100,6 @@ export function makeChain(cfg) {
     },
 
     // Normalised receipt for the plain-transfer scheme.
-    async transferReceipt(hash) {
-      // The public RPC is several nodes that index at different speeds: give a fresh receipt a few seconds to appear.
-      let r = null;
-      for (let i = 0; i < 8 && !r; i++) {
-        try { r = await pub.getTransactionReceipt({ hash }); } catch { if (i < 7) await new Promise((res) => setTimeout(res, 1000)); }
-      }
-      if (!r) return null;
-      const [block, head] = await Promise.all([pub.getBlock({ blockNumber: r.blockNumber }), pub.getBlockNumber()]);
-      return {
-        status: r.status,
-        from: r.from,
-        confirmations: Number(head - r.blockNumber) + 1,
-        timestamp: Number(block.timestamp),
-        logs: r.logs.map((l) => ({ address: l.address, topics: l.topics, data: l.data })),
-      };
-    },
+    transferReceipt: (hash) => receiptOf(pub, hash),
   };
 }

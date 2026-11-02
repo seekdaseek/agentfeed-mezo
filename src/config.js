@@ -19,17 +19,21 @@ export const MUSD = {
 // only the chain id in the domain differs. Verified on-chain on Nov 2 2026 (eip712Domain + recomputed DOMAIN_SEPARATOR).
 const MUSD_MAIN = { ...MUSD, address: '0xdD468A1DDc392dcdbEf6db6e34E89AA338F9F186' };
 
+// Mezo Borrow contracts per Mezo network (mezo-org/musd, solidity/artifacts/deployments/{matsnet,mainnet}); Base has none.
+const BORROW_TEST = { borrowerOperations: '0xCdF7028ceAB81fA0C6971208e83fa7872994beE5', signatures: '0xD757e3646AF370b15f32EB557F0F8380Df7D639e', troveManager: '0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0', priceFeed: '0x86bCF0841622a5dAC14A313a15f96A95421b9366', hintHelpers: '0x4e4cBA3779d56386ED43631b4dCD6d8EacEcBCF6', sortedTroves: '0x722E4D24FD6Ff8b0AC679450F3D91294607268fA' };
+const BORROW_MAIN = { borrowerOperations: '0x44b1bac67dDA612a41a58AAf779143B181dEe031', signatures: '0xB57ab578BF20b3e318f3EFAA587C51DBccE5df7a', troveManager: '0x94AfB503dBca74aC3E4929BACEeDfCe19B93c193', priceFeed: '0xc5aC5A8892230E0A3e1c473881A2de7353fFcA88', hintHelpers: '0xD267b3bE2514375A075fd03C3D9CBa6b95317DC3', sortedTroves: '0x8C5DB4C62BF29c1C4564390d10c20a47E0b2749f' };
+
 // Every network the gateway can sell on. `envPrefix` names the variables of a non-legacy network; the testnet keeps the
 // Wave 1 names (TREASURY_ADDRESS, SETTLER_PRIVATE_KEY) so the running deployment needs no change.
 export const NETWORK_DEFS = {
   'mezo-testnet': {
     network: MEZO_TESTNET.network, chainId: MEZO_TESTNET.chainId, label: 'Mezo testnet', mainnet: false,
-    rpcUrls: [MEZO_TESTNET.rpcUrl], explorer: MEZO_TESTNET.explorer, asset: MUSD, surchargeCents: 0, envPrefix: '', keyPrefix: '',
+    rpcUrls: [MEZO_TESTNET.rpcUrl], explorer: MEZO_TESTNET.explorer, asset: MUSD, surchargeCents: 0, envPrefix: '', keyPrefix: '', borrow: BORROW_TEST,
   },
   'mezo-mainnet': {
     network: 'eip155:31612', chainId: 31612, label: 'Mezo mainnet', mainnet: true,
     rpcUrls: ['https://mezo-mainnet.boar.network', 'https://mainnet.mezo.public.validationcloud.io', 'https://rpc-http.mezo.boar.network'],
-    explorer: 'https://explorer.mezo.org', asset: MUSD_MAIN,
+    explorer: 'https://explorer.mezo.org', asset: MUSD_MAIN, borrow: BORROW_MAIN,
     // BTC gas on Mezo mainnet was 1,462,500 wei on Nov 2 2026: about 1.5 cents for a permit + transferFrom pair.
     surchargeCents: 2, envPrefix: 'MEZO_MAINNET_', keyPrefix: '31612:',
   },

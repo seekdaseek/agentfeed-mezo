@@ -103,6 +103,14 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const n = Number(flag('--n', '1'));
   const gap = Number(flag('--gap-ms', '0'));
   const pretty = args.includes('--pretty') ? (args.splice(args.indexOf('--pretty'), 1), true) : false;
+  if (args[0] === 'sign-register') {
+    // AGENT_PRIVATE_KEY=0x... node src/client.js sign-register <telegram user id> <agent name>
+    const { registerMessage } = await import('./agents.js');
+    const acct = privateKeyToAccount(process.env.AGENT_PRIVATE_KEY);
+    const sig = await acct.signMessage({ message: registerMessage({ ownerTg: Number(args[1]), name: args[2], address: acct.address }) });
+    console.log(`/newagent ${args[2]} ${acct.address} <daily cap MUSD> ${sig}`);
+    process.exit(0);
+  }
   const [route, ...kv] = args;
   if (!route || !process.env.AGENT_PRIVATE_KEY) {
     console.error('usage: AGENT_PRIVATE_KEY=0x... [GATEWAY_URL=...] node src/client.js <route> [k=v ...] [--scheme permit|transfer] [--n N]');
