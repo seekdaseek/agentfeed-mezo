@@ -52,12 +52,12 @@ export function fakeUpstream() {
   return new Promise((r) => u.server.listen(0, '127.0.0.1', () => { u.url = `http://127.0.0.1:${u.server.address().port}`; r(u); }));
 }
 
-export async function boot({ chain = fakeChain(), clock } = {}) {
+export async function boot({ chain = fakeChain(), clock, local } = {}) {
   const up = await fakeUpstream();
   const cfg = loadConfig({ ...baseEnv(), UPSTREAM_URL: up.url });
   const store = openStore(':memory:');
   const t = { now: Math.floor(Date.now() / 1000) };
-  const gw = createGateway({ cfg, chain, store, now: clock || (() => t.now) });
+  const gw = createGateway({ cfg, chain, store, now: clock || (() => t.now), ...(local ? { local } : {}) });
   await new Promise((r) => gw.listen(0, '127.0.0.1', r));
   const url = `http://127.0.0.1:${gw.address().port}`;
   const close = () => { gw.closeAllConnections(); gw.close(); up.server.closeAllConnections(); up.server.close(); store.close(); };

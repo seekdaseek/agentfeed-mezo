@@ -5,6 +5,7 @@ import { makeNonce } from './challenge.js';
 import { checkEnvelope, verifyPermit, verifyTransfer } from './payments.js';
 import { landingHtml } from './landing.js';
 import { openAgents } from './agents.js';
+import { pegReport, troveHealth } from './mezo-data.js';
 
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64');
 const fromB64 = (s) => JSON.parse(Buffer.from(s, 'base64').toString('utf8'));
@@ -17,7 +18,7 @@ const STATUS = {
   malformed_payment: 400, unsupported_scheme: 400, payment_in_flight: 429,
 };
 
-export function createGateway({ cfg, chain, chains, store, fetchImpl = fetch, now = () => Math.floor(Date.now() / 1000) }) {
+export function createGateway({ cfg, chain, chains, store, fetchImpl = fetch, now = () => Math.floor(Date.now() / 1000), local = { peg: pegReport, trove: troveHealth } }) {
   // One entry per network the gateway sells on. Wave 1 callers pass a single `chain` and no cfg.networks: that is one
   // Mezo testnet entry built from the top-level config.
   const nets = cfg.networks || [{ key: 'mezo-testnet', network: cfg.network, chainId: cfg.chainId, label: 'Mezo testnet', explorer: cfg.explorer,
@@ -111,6 +112,18 @@ export function createGateway({ cfg, chain, chains, store, fetchImpl = fetch, no
     }
   }
 
+  // Routes answered from the chains themselves (src/mezo-data.js) rather than by AgentFeed. Same rule as upstream: a failed read is a 502 and charges nothing.
+  async function localData(route, query) {
+    const t0 = Date.now();
+    try {
+      const data = await local[route.local](Object.fromEntries(query));
+      return { ok: true, json: { tool: route.id.replace(/-/g, '_'), data, source: 'agentfeed-mezo, read from the chain at request time' }, ms: Date.now() - t0 };
+    } catch (e) {
+      if (e.status === 400) return { error: 'bad_request', status: 400, detail: e.message, ms: Date.now() - t0 };
+      return { error: 'data_unavailable', status: 502, detail: 'a chain read failed', ms: Date.now() - t0 };
+    }
+  }
+
   async function paid(req, res, route, url) {
     const t0 = Date.now();
     const cp = cleanParams(route, url.searchParams);
@@ -153,7 +166,7 @@ export function createGateway({ cfg, chain, chains, store, fetchImpl = fetch, no
       if (!reserved) return send402(res, route, 'payment_replayed', 'this payment was already used');
 
       // Fetch first, settle second: if AgentFeed is down the payer is never charged.
-      const up = await upstream(route, cp.query);
+      const up = route.local ? await localData(route, cp.query) : await upstream(route, cp.query);
       if (!up.ok) {
         store.release(v.keys); reserved = false;
         return send(res, up.status, { error: up.error, charged: false, detail: up.detail, message: 'no payment was taken; retry with the same payment' });

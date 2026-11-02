@@ -28,7 +28,7 @@ describe('402 challenge', () => {
   });
   test('every route answers 402 with its own price; unknown route 404; bad param 400; non-GET 405', async () => {
     for (const r of ROUTES) {
-      if (r.params.url) continue;
+      if (Object.values(r.params).some((x) => x.endsWith('!'))) continue; // needs a parameter to get past the 400
       const ch = await challenge(ctx.url, r.id);
       assert.equal(ch.status, 402, r.id);
       assert.equal(ch.body.accepts[0].amount, String(priceWei(r)));

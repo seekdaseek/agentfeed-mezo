@@ -16,9 +16,9 @@ describe('challenge nonce', () => {
 });
 
 describe('routes', () => {
-  test('8 routes, cents pricing, unique ids', () => {
-    assert.equal(ROUTES.length, 8);
-    assert.equal(new Set(ROUTES.map((r) => r.id)).size, 8);
+  test('10 routes, cents pricing, unique ids', () => {
+    assert.equal(ROUTES.length, 10);
+    assert.equal(new Set(ROUTES.map((r) => r.id)).size, 10);
     for (const r of ROUTES) assert.ok(Number.isInteger(r.cents) && r.cents >= 1 && r.cents <= 5);
     assert.equal(priceWei(ROUTES[0]), 10n ** 16n);
     assert.equal(priceMusd(ROUTES.find((r) => r.id === 'summarize')), '0.05');

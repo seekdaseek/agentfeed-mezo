@@ -10,6 +10,8 @@ export const ROUTES = [
   { id: 'liquidations', upstream: '/api/liquidations', cents: 2, params: { symbol: 'string', scope: 'string', limit: 'int', min_usd: 'number' }, title: 'Recent liquidations', description: 'Live liquidation tape across venues. Optional symbol, scope, limit, min_usd.' },
   { id: 'market-snapshot', upstream: '/api/market-snapshot', cents: 2, params: {}, title: 'Market snapshot', description: 'Crypto market snapshot in one call.' },
   { id: 'trade-context', upstream: '/api/trade-context', cents: 3, params: {}, title: 'Trade context', description: 'Crypto trading context in one call: prices, funding, liquidations.' },
+  { id: 'mezo-peg', local: 'peg', cents: 3, params: {}, title: 'MUSD peg', description: 'Where MUSD trades against a dollar right now: Mezo mainnet pools and Base, at 1 and 100 MUSD, with the deviation in basis points, read from the chains.' },
+  { id: 'mezo-trove', local: 'trove', cents: 2, params: { address: 'address!', network: 'enum:mainnet|testnet' }, title: 'Mezo trove health', description: 'One address on Mezo Borrow: collateral ratio, liquidation price and distance to it, and how much MUSD Mezo would redeem from other troves first. ?address=0x...&network=mainnet|testnet.' },
   { id: 'summarize', upstream: '/api/summarize', cents: 5, params: { url: 'string!', length: 'string' }, title: 'Summarize a web page', description: 'Fixed-purpose language task: summarize the page at ?url=. Optional length.' },
 ];
 
@@ -29,6 +31,8 @@ export function cleanParams(route, searchParams) {
       continue;
     }
     if (v.length > 2048) return { ok: false, error: `${name} is too long` };
+    if (type === 'address' && !/^0x[0-9a-fA-F]{40}$/.test(v)) return { ok: false, error: `${name} must be an 0x address` };
+    if (type.startsWith('enum:') && !type.slice(5).split('|').includes(v)) return { ok: false, error: `${name} must be one of ${type.slice(5).split('|').join(', ')}` };
     if (type === 'int' && !/^\d{1,6}$/.test(v)) return { ok: false, error: `${name} must be an integer` };
     if (type === 'number' && !/^\d{1,15}(\.\d{1,6})?$/.test(v)) return { ok: false, error: `${name} must be a number` };
     query.set(name, v);
