@@ -70,7 +70,12 @@ export function makeTroveOps(net, reader) {
     },
     simulate: (a) => pub.simulateContract({ address: b.signatures, abi: ABI, functionName: 'withdrawMUSDWithSignature', args: [a.amount, a.upper, a.lower, a.borrower, a.recipient, a.signature, a.deadline], account: submitter.address }),
     submit: (a) => wallet.writeContract({ address: b.signatures, abi: ABI, functionName: 'withdrawMUSDWithSignature', args: [a.amount, a.upper, a.lower, a.borrower, a.recipient, a.signature, a.deadline], gas: 1_500_000n }),
-    receipt: (hash) => reader.transferReceipt(hash),
+    // Wait for the block instead of polling for a few seconds: the first live draw was mined, but a short poll gave up before
+    // the receipt showed and the bot wrongly reported failure. null means "not seen yet", which is not the same as "failed".
+    async receipt(hash) {
+      try { await pub.waitForTransactionReceipt({ hash, timeout: 90_000, pollingInterval: 1500 }); } catch { return null; }
+      return reader.transferReceipt(hash);
+    },
   };
 }
 
@@ -111,8 +116,10 @@ export function makeTrove({ agents, opsFor }) {
 
     let hash;
     try { hash = await ops.submit(args); } catch (e) { return refuse(`submit failed: ${e.shortMessage || e.message}`); }
-    const rc = await ops.receipt(hash);
-    if (!rc || rc.status !== 'success') return `The draw transaction ${hash} did not succeed on ${net.label}; the budget was not credited.`;
+    let rc = null;
+    try { rc = await ops.receipt(hash); } catch { rc = null; }
+    if (!rc) return `The draw was submitted but I could not read its receipt yet, so the budget was NOT credited: ${net.explorer}/tx/${hash}\nIf it shows Success there, /confirm ${agent.name} ${hash} ${net.key} credits the MUSD it minted to ${agent.name}.`;
+    if (rc.status !== 'success') return `The draw transaction ${hash} failed on ${net.label}; the budget was not credited.`;
     const minted = rc.logs.filter((l) => l.topics?.[0] === TRANSFER_TOPIC && l.topics.length === 3 && `0x${l.topics[2].slice(26)}`.toLowerCase() === recipient.toLowerCase() && l.address.toLowerCase() === net.asset.address.toLowerCase())
       .reduce((x, l) => x + BigInt(l.data), 0n);
     if (minted === 0n) return `The draw transaction ${hash} succeeded but no MUSD reached the agent wallet; the budget was not credited.`;

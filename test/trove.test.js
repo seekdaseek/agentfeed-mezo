@@ -118,8 +118,16 @@ describe('draw', () => {
     ops.simulateError = 'ICR below MCR'; assert.match(await run(), /Mezo would revert it: ICR below MCR/);
     assert.equal(ops.calls.filter((c) => c[0] === 'submit').length, 0);
   });
+  test('a receipt that is not there yet is not called a failure: the bot says so and names /confirm, and credits nothing', async () => {
+    ops.receipt = async () => null;
+    const r = await run();
+    assert.match(r, /could not read its receipt yet/);
+    assert.match(r, /\/confirm bot1 0xabab/);
+    assert.doesNotMatch(r, /failed|did not succeed/);
+    assert.equal(agents.state(agents.byId(agent.id), NOW).budgetTotal, 0n);
+  });
   test('a failed transaction, or one that mints nothing to the agent, credits nothing', async () => {
-    ops.rcStatus = 'reverted'; assert.match(await run(), /did not succeed/);
+    ops.rcStatus = 'reverted'; assert.match(await run(), /failed on Mezo testnet/);
     ops.rcStatus = 'success'; ops.mintedTo = stranger.address; assert.match(await run(), /no MUSD reached the agent wallet/);
     assert.equal(agents.state(agents.byId(agent.id), NOW).budgetTotal, 0n);
   });
