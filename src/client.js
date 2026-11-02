@@ -1,5 +1,5 @@
 // Agent client: pays AgentFeed-on-Mezo routes in MUSD. Library + CLI.
-import { createPublicClient, createWalletClient, http, parseAbi, getAddress } from 'viem';
+import { createPublicClient, createWalletClient, http, fallback, parseAbi, getAddress } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { pathToFileURL } from 'node:url';
 import { MEZO_TESTNET, MUSD, NETWORK_DEFS } from './config.js';
@@ -23,9 +23,22 @@ export function createAgent({
   const account = privateKeyToAccount(privateKey);
   const chainId = Number(network.split(':')[1]);
   const chain = mezoChain(chainId, rpcUrl, NETWORK_DEFS[networkKey].label);
-  const pub = createPublicClient({ chain, transport: http(rpcUrl) });
-  const wallet = createWalletClient({ account, chain, transport: http(rpcUrl) });
+  // the public RPCs rate-limit and lag, so read through every URL known for this network, the chosen one first
+  const urls = [rpcUrl, ...NETWORK_DEFS[networkKey].rpcUrls.filter((u) => u !== rpcUrl)];
+  const transport = urls.length > 1 ? fallback(urls.map((u) => http(u, { retryCount: 1 })), { rank: false }) : http(rpcUrl);
+  const pub = createPublicClient({ chain, transport });
+  const wallet = createWalletClient({ account, chain, transport });
   baseUrl = baseUrl.replace(/\/$/, "");
+
+  // a permit nonce only goes up: read it from every RPC we know and take the highest, so a lagging node cannot return a used one
+  async function highestNonce(who) {
+    const rs = await Promise.allSettled(urls.map((u) => createPublicClient({ chain, transport: http(u, { retryCount: 0 }) }).readContract({ address: token, abi, functionName: 'nonces', args: [who] })));
+    const ok = rs.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+    // the gateway also knows the highest nonce it has settled for this wallet, which no lagging RPC node can contradict
+    try { const g = await (await fetchImpl(`${baseUrl}/nonce/${chainId}/${who}`)).json(); if (g && /^\d+$/.test(g.nonce || '')) ok.push(BigInt(g.nonce)); } catch { /* the RPC answers alone */ }
+    if (!ok.length) throw rs[0].reason;
+    return ok.reduce((a, b) => (b > a ? b : a));
+  }
 
   const urlFor = (route, params = {}) => {
     const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null && v !== '').map(([k, v]) => [k, String(v)]));
@@ -62,7 +75,7 @@ export function createAgent({
     const owner = account.address;
     let payment;
     if (scheme === 'permit') {
-      const nonce = await pub.readContract({ address: token, abi, functionName: 'nonces', args: [owner] });
+      const nonce = await highestNonce(owner);
       const deadline = BigInt(accept.extra.expiresAt);
       const signature = await account.signTypedData({
         domain: { name: accept.extra.name, version: accept.extra.version, chainId, verifyingContract: getAddress(accept.asset) },

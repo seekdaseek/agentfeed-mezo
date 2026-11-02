@@ -72,7 +72,9 @@ export async function verifyPermit({ cfg, chain, store, price, payment, env, now
   const keys = [`sig:${keccak256(p.signature)}`, `ch:${payment.nonce}`];
   if (keys.some((k) => store.isUsed(k))) return fail('payment_replayed', 'this signature or challenge was already used');
 
-  const permitNonce = await chain.permitNonce(owner);
+  const chainNonce = await chain.permitNonce(owner);
+  const ledgerNonce = store.nextPermitNonce(cfg.keyPrefix || '', owner);
+  const permitNonce = chainNonce > ledgerNonce ? chainNonce : ledgerNonce; // a permit nonce only ever goes up
   keys.push(`pn:${cfg.keyPrefix || ''}${owner.toLowerCase()}:${permitNonce}`);
   if (store.isUsed(keys[2])) return fail('payment_replayed', 'this permit nonce was already settled');
 

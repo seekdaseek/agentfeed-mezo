@@ -60,7 +60,15 @@ export function makeChain(cfg) {
 
   return {
     settlerAddress: settler.address,
-    permitNonce: (owner) => pub.readContract({ address: token, abi: MUSD_ABI, functionName: 'nonces', args: [owner] }),
+    // The public RPC is several nodes at slightly different heights, and a permit nonce only ever goes up: read it from every
+    // URL we know and take the highest, so a lagging node cannot hand back the nonce that was just used (measured on Base,
+    // where blocks are 2 s: 13 of 27 calls were refused for exactly that).
+    async permitNonce(owner) {
+      const rs = await Promise.allSettled(urls.map((u) => createPublicClient({ chain, transport: http(u, { retryCount: 0 }) }).readContract({ address: token, abi: MUSD_ABI, functionName: 'nonces', args: [owner] })));
+      const ok = rs.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+      if (!ok.length) throw rs[0].reason;
+      return ok.reduce((a, b) => (b > a ? b : a));
+    },
     balanceOf: (owner) => pub.readContract({ address: token, abi: MUSD_ABI, functionName: 'balanceOf', args: [owner] }),
 
     // eth_call of permit() from the settler: ground truth that the signature, nonce and deadline are valid on-chain now.

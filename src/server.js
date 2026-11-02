@@ -4,6 +4,7 @@ import { ROUTES, findRoute, priceWei, priceMusd, cleanParams } from './routes.js
 import { makeNonce } from './challenge.js';
 import { checkEnvelope, verifyPermit, verifyTransfer } from './payments.js';
 import { landingHtml } from './landing.js';
+import { getAddress } from 'viem';
 import { openAgents } from './agents.js';
 import { pegReport, troveHealth } from './mezo-data.js';
 
@@ -242,6 +243,15 @@ export function createGateway({ cfg, chain, chains, store, fetchImpl = fetch, no
         if (!a) return send(res, 200, { registered: false });
         const st = agents.state(a, now());
         return send(res, 200, { registered: true, name: a.name, status: a.status, remaining_musd: musdStr(st.remaining), daily_remaining_musd: musdStr(st.dailyRemaining), daily_cap_musd: musdStr(st.dailyCap), resets_at: new Date(st.resetsAt * 1000).toISOString() });
+      }
+      if (/^\/nonce\/\d+\/0x[0-9a-fA-F]{40}$/.test(p)) {
+        // Free: the permit nonce a payer must sign with on a network, the higher of the chain's answer and this ledger's.
+        const [, , chainId, owner] = p.split('/');
+        const n = nets.find((x) => String(x.chainId) === chainId);
+        if (!n) return send(res, 404, { error: 'unknown_network', networks: nets.map((x) => x.chainId) });
+        const chainNonce = await chainFor(n).permitNonce(getAddress(owner)).catch(() => 0n);
+        const floor = store.nextPermitNonce(n.keyPrefix || '', owner);
+        return send(res, 200, { network: n.network, owner: getAddress(owner), nonce: String(chainNonce > floor ? chainNonce : floor) });
       }
       if (p === '/payments.csv') return send(res, 200, csv(), { 'content-type': 'text/csv; charset=utf-8' });
       return send(res, 404, { error: 'not_found', see: '/.well-known/x402' });

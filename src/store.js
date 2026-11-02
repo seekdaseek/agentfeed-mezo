@@ -42,6 +42,14 @@ export function openStore(path) {
                   VALUES (@ts, @route, @scheme, @payer, @amount_wei, @nonce, @permit_tx, @tx_hash, @upstream_ms, @total_ms, @network)`).run({ network: 'eip155:31611', ...p });
     }),
     isUsed: (key) => !!sel.get(key),
+    // The next permit nonce this ledger knows an owner must be on: one above the highest nonce it has settled for them.
+    // The public RPC can lag a block behind, so a freshly used nonce can still read as current; the ledger cannot.
+    nextPermitNonce(prefix, owner) {
+      const rows = db.prepare("SELECT key FROM replay WHERE state = 'used' AND key LIKE ?").all(`pn:${prefix}${owner.toLowerCase()}:%`);
+      let next = 0n;
+      for (const r of rows) { const n = BigInt(r.key.slice(r.key.lastIndexOf(':') + 1)) + 1n; if (n > next) next = n; }
+      return next;
+    },
     stats() {
       const rows = db.prepare('SELECT amount_wei, network, payer FROM payments').all();
       const t = { n: rows.length, wei: rows.reduce((a, r) => a + BigInt(r.amount_wei), 0n) };

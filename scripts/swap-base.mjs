@@ -43,9 +43,15 @@ if (allowance < amountIn) {
   const h = await wallet.writeContract({ address: USDC, abi: erc, functionName: 'approve', args: [ROUTER, amountIn] });
   const r = await pub.waitForTransactionReceipt({ hash: h });
   console.log('approve', r.status, `https://basescan.org/tx/${h}`, 'gasUsed', String(r.gasUsed));
+  // The public RPC is several nodes: wait until the allowance is visible to the node that will estimate the swap.
+  for (let i = 0; i < 20; i++) { const a = await pub.readContract({ address: USDC, abi: erc, functionName: 'allowance', args: [account.address, ROUTER] }); if (a >= amountIn) break; await new Promise((res) => setTimeout(res, 1000)); }
 }
 const h = await wallet.writeContract({ address: ROUTER, abi: router, functionName: 'exactInputSingle', args: [{ tokenIn: USDC, tokenOut: MUSD, fee, recipient: account.address, amountIn, amountOutMinimum: minOut, sqrtPriceLimitX96: 0n }] });
 const r = await pub.waitForTransactionReceipt({ hash: h });
-const musd = await pub.readContract({ address: MUSD, abi: erc, functionName: 'balanceOf', args: [account.address] });
-const ethAfter = await pub.getBalance({ address: account.address });
+let musd = 0n, ethAfter = gasBefore;
+for (let i = 0; i < 20 && (musd === 0n || ethAfter === gasBefore); i++) { // same lagging-node reason: read until the result shows
+  musd = await pub.readContract({ address: MUSD, abi: erc, functionName: 'balanceOf', args: [account.address] });
+  ethAfter = await pub.getBalance({ address: account.address });
+  if (musd === 0n || ethAfter === gasBefore) await new Promise((res) => setTimeout(res, 1000));
+}
 console.log('swap', r.status, `https://basescan.org/tx/${h}`, 'MUSD balance', formatUnits(musd, 18), 'ETH spent on gas (approve+swap, incl. L1 fee)', formatEther(gasBefore - ethAfter));

@@ -211,3 +211,26 @@ describe('outside payers are counted apart from our own wallets', () => {
     assert.deepEqual([b.settled_calls, b.distinct_payers, b.outside_payers], [2, 2, 1]);
   });
 });
+
+describe('a lagging RPC cannot hand back a permit nonce that was just used', () => {
+  test('the ledger raises the nonce: the chain still says 0 after a settlement, the gateway expects 1', async () => {
+    const ch = await challenge();
+    assert.equal((await pay('sol-price', await permitFor(ch, BASE))).status, 200);
+    // a lagging node: the fake chain forgets the increment, as a stale RPC read would
+    ctx.chains[BASE].nonces.set(agent.address.toLowerCase(), 0n);
+    ctx.t.now += 1; // a different deadline, so it is a different signature and not a plain replay of the first one
+    const stale = await pay('sol-price', await permitFor(await challenge(), BASE)); // signed with 0, as a stale client would
+    assert.equal((await stale.json()).error, 'bad_signature', 'refused, never settled twice');
+    assert.equal(ctx.chains[BASE].settled.length, 1);
+    // signed with the nonce the gateway publishes: accepted although the chain read is still stale
+    const n = await (await fetch(`${ctx.url}/nonce/8453/${agent.address}`)).json();
+    assert.equal(n.nonce, '1');
+    ctx.chains[BASE].nonces.set(agent.address.toLowerCase(), 1n);
+    assert.equal((await pay('sol-price', await permitFor(await challenge(), BASE))).status, 200);
+  });
+  test('the nonce endpoint is per network and answers 404 for a network it does not sell on', async () => {
+    assert.equal((await fetch(`${ctx.url}/nonce/1/${agent.address}`)).status, 404);
+    assert.equal((await (await fetch(`${ctx.url}/nonce/31612/${agent.address}`)).json()).nonce, '0');
+    assert.equal((await fetch(`${ctx.url}/nonce/8453/nope`)).status, 404);
+  });
+});
