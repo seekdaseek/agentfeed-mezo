@@ -20,6 +20,17 @@ export const fmtMusd = (wei) => {
 };
 const short = (h) => `${h.slice(0, 10)}…${h.slice(-6)}`;
 
+// The menu Telegram shows under "/" (setMyCommands). Order is the order a new owner uses them: sign, register, list, fund, watch, draw.
+export const BOT_COMMANDS = [
+  { command: 'regmsg', description: 'First step: the message your agent wallet signs' },
+  { command: 'newagent', description: 'Register an agent wallet with a daily cap' },
+  { command: 'agents', description: 'Your agents and what is left of their budgets' },
+  { command: 'topup', description: 'Fund a budget by sending MUSD to the agent wallet' },
+  { command: 'calls', description: 'Every paid call, with its explorer link' },
+  { command: 'draw', description: 'Fund from your own Mezo trove (floor checked here)' },
+  { command: 'help', description: 'What this bot does' },
+];
+
 export const HELP = `AgentFeed on Mezo: budgets for your agents. Your agent wallet pays per call in MUSD; the gateway refuses any call over the limits you set here.
 
 /regmsg <name> <address>   the message your agent wallet signs to prove it is yours

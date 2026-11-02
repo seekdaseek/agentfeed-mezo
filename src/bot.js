@@ -5,7 +5,7 @@ import { loadConfig } from './config.js';
 import { openStore } from './store.js';
 import { openAgents } from './agents.js';
 import { makeReader } from './chain.js';
-import { makeBotCore, HELP } from './botcore.js';
+import { makeBotCore, HELP, BOT_COMMANDS } from './botcore.js';
 import { makeTrove, makeTroveOps } from './trove.js';
 import { makeTranscript } from './transcript.js';
 
@@ -36,7 +36,7 @@ bot.on('message:text', async (ctx) => {
   await ctx.reply(String(reply).slice(0, 4000), { link_preview_options: { is_disabled: true } });
 });
 bot.catch((e) => console.error('bot error', e.message));
-await bot.api.setMyCommands([{ command: 'help', description: 'what this bot does' }, { command: 'agents', description: 'your agents and budgets' }, { command: 'newagent', description: 'register an agent wallet' }]);
+await bot.api.setMyCommands(BOT_COMMANDS);
 for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { bot.stop(); store.close(); process.exit(0); });
 console.log(`agentfeed-mezo bot started; networks=${cfg.networks.map((n) => n.key).join(',')}; help is ${HELP.split('\n')[0].length} chars`);
 bot.start();

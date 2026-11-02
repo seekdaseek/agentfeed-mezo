@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { openStore } from '../src/store.js';
 import { openAgents, registerMessage } from '../src/agents.js';
-import { makeBotCore, parseMusd, fmtMusd } from '../src/botcore.js';
+import { makeBotCore, parseMusd, fmtMusd, BOT_COMMANDS } from '../src/botcore.js';
 import { loadConfig } from '../src/config.js';
 import { TRANSFER_TOPIC } from '../src/chain.js';
 
@@ -146,5 +146,19 @@ describe('calls', () => {
     const r = await bot.handle(A, '/agent bot1');
     assert.match(r, /bot1 \[active\]/);
     assert.match(r, /trove floor 200% \(checked by this bot, off-chain\)/);
+  });
+});
+
+describe('the command menu', () => {
+  test('lists regmsg, newagent, agents, topup, calls, draw, help in that order', () => {
+    assert.deepEqual(BOT_COMMANDS.map((c) => c.command), ['regmsg', 'newagent', 'agents', 'topup', 'calls', 'draw', 'help']);
+  });
+  test('regmsg is described as the first step', () => assert.match(BOT_COMMANDS[0].description, /^First step: the message your agent wallet signs$/));
+  test('every entry meets Telegram\'s limits (name 1-32 of a-z 0-9 _, description 3-256) and is a command the bot answers', async () => {
+    for (const c of BOT_COMMANDS) {
+      assert.match(c.command, /^[a-z0-9_]{1,32}$/);
+      assert.ok(c.description.length >= 3 && c.description.length <= 256, c.command);
+      assert.doesNotMatch(await bot.handle(A, `/${c.command}`), /Unknown command/, `/${c.command} is in the menu but the bot does not know it`);
+    }
   });
 });
