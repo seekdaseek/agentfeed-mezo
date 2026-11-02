@@ -97,6 +97,19 @@ describe('the rules', () => {
     spend(agent.created_ts - 5000, CENT, 3);
     assert.equal(agents.state(agent, NOW).spentTotal, 0n);
   });
+  test('refusal messages state MUSD, not wei', () => {
+    top(2n * CENT, '0xaa');
+    spend(NOW + 1, CENT, 2);
+    const budget = agents.check(agent, CENT, NOW + 2);
+    assert.equal(budget.code, 'budget_exceeded');
+    assert.equal(budget.message, 'budget left 0.00 MUSD, this call costs 0.01 MUSD');
+    top(100n * CENT, '0xbb');
+    spend(NOW + 3, CENT, 1); // 3 cents today, cap is 3 cents
+    const cap = agents.check(agent, 2n * CENT, NOW + 4);
+    assert.equal(cap.code, 'daily_cap_exceeded');
+    assert.match(cap.message, /^daily cap of 0\.03 MUSD would be passed \(0\.03 spent today, this call costs 0\.02\); it resets at /);
+    assert.doesNotMatch(cap.message + budget.message, /wei|\d{10,}/);
+  });
   test('paused and revoked refuse whatever the budget', () => {
     top(10n * CENT, '0xaa');
     agents.setStatus(agent, OWNER, 'paused');

@@ -2,7 +2,7 @@
 // An owner registers an agent wallet (proving they control it with a signature), tops its budget up, and the gateway
 // refuses any call from that wallet that would go over the remaining budget, over the daily cap, or while the agent is
 // paused or revoked. Spending is read from the payments ledger, so there is no second source of truth to drift.
-import { recoverMessageAddress, getAddress, isAddress } from 'viem';
+import { recoverMessageAddress, getAddress, isAddress, formatUnits } from 'viem';
 
 export const DAY = 86400;
 export const dayStart = (ts) => Math.floor(ts / DAY) * DAY; // caps reset at UTC midnight
@@ -11,6 +11,8 @@ export const registerMessage = ({ ownerTg, name, address }) =>
   `AgentFeed-Mezo agent registration\nowner:${ownerTg}\nname:${name}\naddress:${address.toLowerCase()}`;
 
 const fail = (code, message) => ({ ok: false, code, message });
+// MUSD amounts in messages, never wei: 30000000000000000 means nothing to the person reading a refusal
+const musd = (w) => { const [i, f = ''] = formatUnits(BigInt(w), 18).split('.'); return `${i}.${f.padEnd(2, '0')}`; };
 const wei = (v) => BigInt(v);
 
 export function openAgents(db) {
@@ -110,8 +112,8 @@ export function openAgents(db) {
       if (agent.status === 'revoked') return fail('agent_revoked', 'this agent was revoked by its owner');
       if (agent.status === 'paused') return fail('agent_paused', 'this agent is paused by its owner');
       const s = api.state(agent, now);
-      if (s.remaining < price) return fail('budget_exceeded', `budget left ${s.remaining} wei MUSD, this call costs ${price}`);
-      if (s.spentToday + price > s.dailyCap) return fail('daily_cap_exceeded', `daily cap ${s.dailyCap} wei MUSD would be passed; it resets at ${new Date(s.resetsAt * 1000).toISOString()}`);
+      if (s.remaining < price) return fail('budget_exceeded', `budget left ${musd(s.remaining)} MUSD, this call costs ${musd(price)} MUSD`);
+      if (s.spentToday + price > s.dailyCap) return fail('daily_cap_exceeded', `daily cap of ${musd(s.dailyCap)} MUSD would be passed (${musd(s.spentToday)} spent today, this call costs ${musd(price)}); it resets at ${new Date(s.resetsAt * 1000).toISOString()}`);
       return { ok: true };
     },
   };
