@@ -4,7 +4,7 @@ Real MUSD on Base (`0xdD468A1DDc392dcdbEf6db6e34E89AA338F9F186`), paid to the ga
 
 **51 paid calls on Base so far, all 10 routes, both schemes.** Every row is in [`paid-calls.csv`](paid-calls.csv) (network column `eip155:8453`) and was re-read from Base by `node scripts/verify-evidence.mjs`.
 
-How the payer got its MUSD (no new money): 0.90 USDC from an existing test wallet, swapped on PancakeSwap V3 (USDC/MUSD 0.01% pool) for 0.908797545 MUSD: [swap](https://basescan.org/tx/0x3ea3a03ddba8783af11855fc86cf69db088d18f578926d149c40370240798e78). Spent MUSD collects in the treasury and is sent back to the payer by [`scripts/recycle-base.mjs`]( ../scripts/recycle-base.mjs): [recycle of 0.9 MUSD](https://basescan.org/tx/0x357a13c31426d3ffab6eb127183a7643f7e0ce3d827fe0fa83b26ddae78a0d75), 29,785 gas.
+How the payer got its MUSD (no new money): 0.90 USDC from an existing test wallet, [approved](https://basescan.org/tx/0x6698705fa5744bbdfbf27a793a910be090e46d9d76cc881efcce9176ec418934) (block 53409010, 55,437 gas; recovered from the USDC `Approval` event because the first run's output was lost), then swapped on PancakeSwap V3 (USDC/MUSD 0.01% pool) for 0.908797545 MUSD: [swap](https://basescan.org/tx/0x3ea3a03ddba8783af11855fc86cf69db088d18f578926d149c40370240798e78). Spent MUSD collects in the treasury and is sent back to the payer by [`scripts/recycle-base.mjs`](../scripts/recycle-base.mjs): [recycle of 0.9 MUSD](https://basescan.org/tx/0x357a13c31426d3ffab6eb127183a7643f7e0ce3d827fe0fa83b26ddae78a0d75), 29,785 gas.
 
 | route | scheme | MUSD | settlement | permit tx |
 |---|---|---|---|---|
@@ -21,3 +21,5 @@ The three Base wallets were funded with 0.0002 ETH in total. The settler spent 3
 
 ## What went wrong on the way, and the fix
 The first two Base batches had 13 of 27 and 8 of 23 calls refused, none charged. Base blocks are 2 seconds and the public RPC answers from nodes at different heights, so a nonce that had just been used still read as current, on the client and on the gateway: `payment_replayed` or `bad_signature`. Fix: the gateway now treats its own ledger as a floor for the permit nonce (the nonce only goes up), publishes it at `GET /nonce/<chainId>/<address>`, and the client takes the highest of every RPC and the gateway. After the fix, 0 of 23 were refused for that reason (the 8 refusals in the last batch were `insufficient_balance`, the payer had spent its 0.91 MUSD; MUSD was then recycled from the treasury).
+
+The three setup transactions (approve, swap, recycle) are listed with their gas in [`setup-txs.csv`](setup-txs.csv).

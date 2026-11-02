@@ -1,0 +1,4 @@
+network,kind,tx,what,gas_used,gas_eth
+eip155:8453,approve,0x6698705fa5744bbdfbf27a793a910be090e46d9d76cc881efcce9176ec418934,base-agent approves 0.90 USDC to the PancakeSwap V3 SmartRouter (recovered from the Approval event: block 53409010),55437,
+eip155:8453,swap,0x3ea3a03ddba8783af11855fc86cf69db088d18f578926d149c40370240798e78,0.90 USDC to 0.908797545 MUSD on PancakeSwap V3 USDC/MUSD 0.01% (block 53409014),165550,
+eip155:8453,recycle,0x357a13c31426d3ffab6eb127183a7643f7e0ce3d827fe0fa83b26ddae78a0d75,treasury-hot sends 0.9 MUSD to base-agent,29785,0.000000179169
