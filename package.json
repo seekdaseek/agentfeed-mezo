@@ -1,27 +1,58 @@
 {
-  "name": "agentfeed-mezo",
-  "version": "0.1.0",
-  "description": "Pay-per-call AgentFeed market data for AI agents, settled in MUSD on Mezo",
+  "name": "@seekdaseek/agentfeed-mezo",
+  "version": "0.2.0",
+  "description": "Pay AgentFeed per call in MUSD on Mezo and Base. An MCP server and CLI for agents, plus the HTTP 402 gateway behind mezo.ochinimus.app.",
+  "mcpName": "io.github.seekdaseek/agentfeed-mezo",
   "type": "module",
   "license": "MIT",
   "private": false,
   "engines": {
     "node": ">=22"
   },
+  "bin": {
+    "agentfeed-mezo-mcp": "src/mcp.js",
+    "agentfeed-mezo": "src/client.js"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE",
+    "server.json"
+  ],
   "scripts": {
     "start": "node --env-file=.env src/main.js",
     "test": "node --test --test-reporter=spec \"test/*.test.js\"",
-    "agent": "node --env-file=.env.agent src/client.js"
+    "agent": "node --env-file=.env.agent src/client.js",
+    "bot": "node --env-file=.env src/bot.js",
+    "mcp": "node src/mcp.js"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/seekdaseek/agentfeed-mezo.git"
   },
+  "homepage": "https://mezo.ochinimus.app",
+  "keywords": [
+    "mcp",
+    "mezo",
+    "musd",
+    "x402",
+    "ai-agents",
+    "micropayments",
+    "eip-2612",
+    "base",
+    "bitcoin",
+    "market-data"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
-    "better-sqlite3": "^12.0.0",
-    "grammy": "^1.46.0",
     "viem": "^2.21.0",
     "zod": "^4.6.7"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.0.0",
+    "grammy": "^1.46.0"
   }
 }

@@ -123,3 +123,21 @@ describe('mcp server: call_route refuses safely', () => {
     assert.equal(r.isError, true);
   }));
 });
+
+describe('mcp server: no key', () => {
+  test('starts without AGENT_PRIVATE_KEY, lists routes, and call_route says what is missing without touching anything', async () => {
+    const transport = new StdioClientTransport({ command: process.execPath, args: ['src/mcp.js'], env: { PATH: process.env.PATH, GATEWAY_URL: gwUrl() } });
+    const client = new Client({ name: 'test', version: '0.0.1' });
+    await client.connect(transport);
+    try {
+      seen = [];
+      const list = await client.callTool({ name: 'list_routes', arguments: {} });
+      assert.ok(!list.isError);
+      assert.equal(JSON.parse(text(list)).routes.length, 2);
+      const call = await client.callTool({ name: 'call_route', arguments: { route: 'sol-price' } });
+      assert.equal(call.isError, true);
+      assert.match(text(call), /needs AGENT_PRIVATE_KEY/);
+      assert.deepEqual(seen.map((s) => s.url), ['/.well-known/x402'], 'call_route sent no request at all');
+    } finally { await client.close(); }
+  });
+});

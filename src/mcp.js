@@ -1,15 +1,18 @@
+#!/usr/bin/env node
 // MCP server (stdio) that lets an agent buy AgentFeed data in MUSD. Tools: list_routes, call_route.
-//   AGENT_PRIVATE_KEY=0x... GATEWAY_URL=https://mezo.ochinimus.app node src/mcp.js
+//   AGENT_PRIVATE_KEY=0x... NETWORK=base|mezo-mainnet|mezo-testnet GATEWAY_URL=https://mezo.ochinimus.app npx @seekdaseek/agentfeed-mezo
+// Without AGENT_PRIVATE_KEY the server still starts and list_routes works (it is free); call_route then says what is missing.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import fs from 'node:fs';
 import { createAgent } from './client.js';
 
 const baseUrl = (process.env.GATEWAY_URL || 'https://mezo.ochinimus.app').replace(/\/$/, '');
-if (!process.env.AGENT_PRIVATE_KEY) { console.error('AGENT_PRIVATE_KEY is required'); process.exit(2); }
-const agent = createAgent({ privateKey: process.env.AGENT_PRIVATE_KEY, networkKey: process.env.NETWORK || 'mezo-testnet', baseUrl, maxPriceMusd: Number(process.env.MAX_PRICE_MUSD || 0.1) });
+const NEEDS_KEY = 'call_route spends MUSD and needs AGENT_PRIVATE_KEY (a funded wallet on NETWORK) in the server environment. list_routes is free and works without it.';
+const agent = !process.env.AGENT_PRIVATE_KEY ? null : createAgent({ privateKey: process.env.AGENT_PRIVATE_KEY, networkKey: process.env.NETWORK || 'mezo-testnet', baseUrl, maxPriceMusd: Number(process.env.MAX_PRICE_MUSD || 0.1) });
 
-const server = new McpServer({ name: 'agentfeed-mezo', version: '0.1.0' });
+const server = new McpServer({ name: 'agentfeed-mezo', version: JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version });
 const text = (o) => ({ content: [{ type: 'text', text: typeof o === 'string' ? o : JSON.stringify(o, null, 2) }] });
 
 server.registerTool('list_routes', {
@@ -33,6 +36,7 @@ server.registerTool('call_route', {
   // it moves funds but does not destroy or overwrite anything, so it is not destructive in the MCP sense.
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
 }, async ({ route, params, scheme }) => {
+  if (!agent) return { isError: true, ...text(NEEDS_KEY) };
   try {
     const r = await agent.call(route, params || {}, { scheme: scheme || 'permit' });
     if (!r.ok) return { isError: true, ...text({ status: r.status, error: r.body.error, message: r.body.message }) };

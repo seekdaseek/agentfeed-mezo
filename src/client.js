@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // Agent client: pays AgentFeed-on-Mezo routes in MUSD. Library + CLI.
 import { createPublicClient, createWalletClient, http, fallback, parseAbi, getAddress } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';

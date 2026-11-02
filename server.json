@@ -1,0 +1,49 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.seekdaseek/agentfeed-mezo",
+  "title": "AgentFeed on Mezo",
+  "description": "Live crypto data, MUSD peg and Mezo trove health, paid per call in MUSD on Base or Mezo. One signed permit, no gas.",
+  "websiteUrl": "https://mezo.ochinimus.app",
+  "repository": {
+    "url": "https://github.com/seekdaseek/agentfeed-mezo",
+    "source": "github"
+  },
+  "version": "0.2.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@seekdaseek/agentfeed-mezo",
+      "version": "0.2.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "AGENT_PRIVATE_KEY",
+          "description": "Private key of the wallet that pays, holding MUSD on NETWORK. Optional: list_routes is free and needs no key. Use a dedicated wallet with a small balance; the server never sends the key anywhere and refuses prices above MAX_PRICE_MUSD.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "NETWORK",
+          "description": "base, mezo-mainnet or mezo-testnet. Defaults to mezo-testnet (test MUSD). base and mezo-mainnet spend real MUSD.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "MAX_PRICE_MUSD",
+          "description": "Refuse any call that costs more than this many MUSD. Defaults to 0.10.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "GATEWAY_URL",
+          "description": "Override the gateway. Defaults to https://mezo.ochinimus.app",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

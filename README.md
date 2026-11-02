@@ -113,18 +113,24 @@ How the demo agent got its MUSD: faucet BTC, then [`openTrove`](https://explorer
 
 ## For agents: client and MCP tool
 
-```sh
-AGENT_PRIVATE_KEY=0x... GATEWAY_URL=https://mezo.ochinimus.app node src/client.js <route> [key=value ...] [--scheme permit|transfer] [--n 5]
-```
-
-[`src/client.js`](src/client.js) refuses to sign a challenge for another network or token, or one above `MAX_PRICE_MUSD` (default 0.10). The MCP server is [`src/mcp.js`](src/mcp.js) (stdio):
+Install nothing: an MCP client can run the server straight from npm (listed in the official MCP Registry as `io.github.seekdaseek/agentfeed-mezo`):
 
 ```json
-{ "mcpServers": { "agentfeed-mezo": { "command": "node", "args": ["/path/to/agentfeed-mezo/src/mcp.js"],
-  "env": { "AGENT_PRIVATE_KEY": "0x...", "GATEWAY_URL": "https://mezo.ochinimus.app" } } } }
+{ "mcpServers": { "agentfeed-mezo": { "command": "npx", "args": ["-y", "@seekdaseek/agentfeed-mezo"],
+  "env": { "NETWORK": "base", "AGENT_PRIVATE_KEY": "0x...", "MAX_PRICE_MUSD": "0.10" } } } }
 ```
 
-Tools: `list_routes` (free) and `call_route { route, params?, scheme? }`, which pays in MUSD and returns the data and the explorer link. `node scripts/mcp-smoke.mjs` drives it end to end over stdio.
+`NETWORK` is `mezo-testnet` (default, test MUSD), `base` or `mezo-mainnet` (real MUSD). Use a dedicated wallet with a small MUSD balance: the server signs one permit per call and refuses any price above `MAX_PRICE_MUSD`. Without `AGENT_PRIVATE_KEY` the server still starts and `list_routes` (free) works.
+
+Tools: `list_routes` and `call_route { route, params?, scheme? }`, which pays in MUSD and returns the data and the explorer link of the settlement. `node scripts/mcp-smoke.mjs` drives the same server over stdio from a clone.
+
+From a clone, the command-line client does the same without MCP:
+
+```sh
+AGENT_PRIVATE_KEY=0x... NETWORK=base node src/client.js <route> [key=value ...] [--scheme permit|transfer] [--n 5] [--pretty]
+```
+
+[`src/client.js`](src/client.js) refuses to sign a challenge for another network or token, or one above `MAX_PRICE_MUSD` (default 0.10). A registered agent should use the default `permit` scheme and may read `GET /agents/<address>` first for its remaining budget.
 
 ## How it extends AgentFeed
 

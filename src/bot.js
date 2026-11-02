@@ -7,6 +7,7 @@ import { openAgents } from './agents.js';
 import { makeReader } from './chain.js';
 import { makeBotCore, HELP } from './botcore.js';
 import { makeTrove, makeTroveOps } from './trove.js';
+import { makeTranscript } from './transcript.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN || '';
 if (token.length < 30) { console.error(`TELEGRAM_BOT_TOKEN missing or too short (length ${token.length})`); process.exit(2); }
@@ -19,6 +20,7 @@ const opsCache = new Map();
 const opsFor = (net) => { if (!opsCache.has(net.network)) opsCache.set(net.network, makeTroveOps(net, readers[net.network])); return opsCache.get(net.network); };
 const core = makeBotCore({ agents, networks: cfg.networks, readers, trove: makeTrove({ agents, opsFor }) });
 
+const transcript = makeTranscript(process.env.BOT_TRANSCRIPT || '');
 const bot = new Bot(token);
 const last = new Map(); // simple per-user rate limit: one command per second
 bot.on('message:text', async (ctx) => {
@@ -27,8 +29,10 @@ bot.on('message:text', async (ctx) => {
   const t = Date.now();
   if (t - (last.get(id) || 0) < 1000) return;
   last.set(id, t);
+  transcript.log('in', id, ctx.message.text);
   let reply;
   try { reply = await core.handle(id, ctx.message.text); } catch (e) { console.error('handler error', e.message); reply = 'Something went wrong on my side. Nothing was changed.'; }
+  transcript.log('out', id, String(reply).slice(0, 4000));
   await ctx.reply(String(reply).slice(0, 4000), { link_preview_options: { is_disabled: true } });
 });
 bot.catch((e) => console.error('bot error', e.message));
