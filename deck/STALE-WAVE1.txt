@@ -1,0 +1,2 @@
+STALE: this is the Wave 1 deck (Oct 25 2026): testnet only, 67 calls, one payer.
+The Wave 2 deck is deck-w2/agentfeed-mezo-deck-wave2.pdf (built from the live /stats by deck-w2/build.mjs).

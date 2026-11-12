@@ -6,6 +6,15 @@ The gateway at https://mezo.ochinimus.app answers `402 Payment Required` with a 
 
 It sells AgentFeed's market data (prices, liquidations, funding, a page summary) and two routes about Mezo itself: where MUSD trades against a dollar, and the health of a Mezo trove. The people who run agents can keep them on a budget from Telegram.
 
+## What changed since Wave 1
+
+Wave 1 was Mezo testnet only, one payer, our own test agent. Now, read from the gateway's ledger on Nov 12 2026 (live numbers at [`/stats`](https://mezo.ochinimus.app/stats)): **79 paid calls and 3.14 MUSD on Mezo mainnet, 52 paid calls and 0.96 MUSD on Base, both real money; outside payers: 0.** Every payer so far is our own wallet.
+
+- MUSD is spent on **Mezo mainnet** (chain 31612) and on **Base**, in the same 402 challenge as Mezo testnet; one ledger, with the network on every row, and `/stats` shows each network apart.
+- A **Telegram budget bot** gives the owner of an agent a budget, a daily cap, pause and revoke, and can fund the agent from the owner's own Mezo trove with a collateral floor.
+- Two routes about Mezo itself: `mezo-peg` and `mezo-trove`.
+- The MCP server is on npm and in the MCP Registry.
+
 ## Use it from an MCP client
 
 The server is on npm and in the official MCP Registry as `io.github.seekdaseek/agentfeed-mezo`. Add it to your client's MCP config:
@@ -17,7 +26,7 @@ The server is on npm and in the official MCP Registry as `io.github.seekdaseek/a
 
 | variable | meaning |
 |---|---|
-| `NETWORK` | `mezo-testnet` (default, test MUSD with no value), `base` (**real MUSD on Base**), or `mezo-mainnet` (not offered by the live gateway yet, see Limits) |
+| `NETWORK` | `mezo-testnet` (default, test MUSD with no value), `base` (**real MUSD on Base**), or `mezo-mainnet` (**real MUSD on Mezo mainnet**, live since Nov 12 2026) |
 | `AGENT_PRIVATE_KEY` | the wallet that pays. Use a dedicated wallet with a small balance. Optional: without it the server still starts and `list_routes` works |
 | `MAX_PRICE_MUSD` | refuse any call that costs more than this many MUSD (default `0.10`) |
 | `GATEWAY_URL` | another gateway (default `https://mezo.ochinimus.app`) |
@@ -38,7 +47,7 @@ Options: `--scheme permit|transfer`, `--n 5` (repeat), `--pretty`. `permit` (def
 
 ## Routes and prices
 
-Prices are MUSD per call on Mezo testnet and Base. A Mezo mainnet gateway would add 2 cents for gas.
+Prices are MUSD per call on Mezo testnet and Base. On Mezo mainnet every route costs 2 cents more, because the settler pays gas there in BTC.
 
 | route | MUSD | what |
 |---|---|---|
@@ -78,6 +87,20 @@ Free: `GET /` (page), `/.well-known/x402` (manifest with the prices per network)
 - Mezo testnet, a trove draw funding an agent: 50 MUSD minted to the agent wallet, trove from 156% to 153% with a 150% floor: [`0x9bcd592c…d06d`](https://explorer.test.mezo.org/tx/0x9bcd592c3acffa27899d827a6e0e523cf24a86fc86c87af87365dacce1b7d06d)
 - Mezo testnet, that agent paying 0.02 MUSD for `liquidations` out of the drawn MUSD: [`0x2af1ae19…a44c`](https://explorer.test.mezo.org/tx/0x2af1ae19e306f6d5ac3861167ea703defa6f988cee096f3caccb41324218a44c)
 
+### Mezo mainnet (chain 31612), our own agent as the payer
+
+79 paid calls, 3.14 MUSD, all ten routes, permit scheme, read back from the chain by `node scripts/verify-evidence.mjs evidence/paid-calls-mainnet.csv` (79 of 79; the treasury holds exactly the ledger total). **The payer is our own agent wallet, not an outside user.** `/stats` lists Mezo mainnet as its own line and counts outside payers apart; that count is still zero. The calls are in [`evidence/mainnet-batch.jsonl`](evidence/mainnet-batch.jsonl) and [`evidence/paid-calls-mainnet.csv`](evidence/paid-calls-mainnet.csv).
+
+- First paid call, `sol-price`, 0.03 MUSD: [`0xa9cc85f2…44c5`](https://explorer.mezo.org/tx/0xa9cc85f2201133c141b44472760283fac137a40c0fb82dbddc6368e39d7b44c5)
+
+How the mainnet wallets were funded, from SOL, because MUSD reaches Mezo from Base and gas on Mezo is BTC:
+
+1. Ethereum, tBTC into the Mezo native bridge, recipient the mainnet settler: approve [`0x7bc162d2…5188`](https://etherscan.io/tx/0x7bc162d2093d9d6b408aeda3edb5178dc523c8f31bbc406a1b0cddc0ed325188), `bridgeTBTC` [`0xf4885c84…d9c7`](https://etherscan.io/tx/0xf4885c841e9035cd201c8c988090057f145e667abf72c0dc960b47837131d9c7). 17 minutes later Mezo credited exactly 0.000104 BTC to the settler in a system transaction, [`0x66f5a20d…ab44`](https://explorer.mezo.org/tx/0x66f5a20d2f99428e02a2f73d52e4d77b8ebfe9d0e8b697f8f0f7b89474b2ab44), with no claim transaction. The bridge enforces a minimum of 0.0001 tBTC, although its docs say there is none.
+2. Base, USDC to MUSD on the PancakeSwap V3 pool ([`0x711ca0c1…94da`](https://basescan.org/tx/0x711ca0c1ae5cdb16756fa2e463a3e121c417c48389246cbb8a21bfc6a06d94da)), then Wormhole Portal (NTT) to Mezo, recipient the mainnet agent: [`0x4232f791…c37c`](https://basescan.org/tx/0x4232f791d86c5b5a9f67b3d116e89ac445a1a7cdf26e1fcfc30803127fa2c37c). No fee was paid on Base beyond gas.
+3. Mezo, redeem by hand with the signed VAA from Wormholescan, because auto relay to Mezo is switched off in the Wormhole transceivers: [`0xda1da971…59d4`](https://explorer.mezo.org/tx/0xda1da971cd198177290fd1a766717f7b96a9ddf6fc27b07cbad5713f1ea759d4), 0.0000005 BTC of gas. The agent then held 3.168 MUSD. The scripts are `scripts/bridge-tbtc-eth.mjs`, `scripts/bridge-musd-base.mjs` and `scripts/redeem-mezo.mjs`.
+
+The Mezo BTC token (`0x7b7C…0000`) and MEZO (`0x7B7c…0001`) both implement EIP-2612 permit on mainnet: their domain separators match name, version 1, chain 31612, and a real `permit()` transaction succeeded on each ([BTC](https://explorer.mezo.org/tx/0xfd9619244dfb87d474b0cee4073cd918d508a99dbf5a9290faabab893b0ec445), [MEZO](https://explorer.mezo.org/tx/0x76cb140709a9ec7e102756c49915e4ca41b832d20b5183939f414879726b9359)). They are **not** payment assets of the gateway.
+
 The Telegram session behind the two testnet transactions is in [`evidence/bot-demo-transcript.md`](evidence/bot-demo-transcript.md), with the user id removed. The gateway's ledger is public at [`/payments.csv`](https://mezo.ochinimus.app/payments.csv), and `node scripts/verify-evidence.mjs` re-reads every row from its chain.
 
 ## How a payment works
@@ -90,13 +113,13 @@ The Telegram session behind the two testnet transactions is in [`evidence/bot-de
 
 ## Addresses
 
-| | Mezo testnet (31611) | Base (8453) |
-|---|---|---|
-| MUSD | `0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503` | `0xdD468A1DDc392dcdbEf6db6e34E89AA338F9F186` |
-| gateway treasury | `0xf01d65DBd1B946C48b7dB1f0A02AaBd021c89227` | `0x3a110E3306Eac48C6531325797B2aa92D9d096c7` |
-| gateway settler | `0xaB7323cB6aaB188D7Dca697496534BA6C95ddbC2` | `0x735Cd2E2F4E4c87e7587A099a21b4d3fe15d763e` |
+| | Mezo testnet (31611) | Base (8453) | Mezo mainnet (31612) |
+|---|---|---|---|
+| MUSD | `0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503` | `0xdD468A1DDc392dcdbEf6db6e34E89AA338F9F186` | `0xdD468A1DDc392dcdbEf6db6e34E89AA338F9F186` |
+| gateway treasury | `0xf01d65DBd1B946C48b7dB1f0A02AaBd021c89227` | `0x3a110E3306Eac48C6531325797B2aa92D9d096c7` | `0xB128982D3737CDfE6DA8467A7a05F62535e2bF5B` |
+| gateway settler | `0xaB7323cB6aaB188D7Dca697496534BA6C95ddbC2` | `0x735Cd2E2F4E4c87e7587A099a21b4d3fe15d763e` | `0x5D41E85833eF8ba943930b8006CBc1c326279F35` |
 
-Mezo mainnet MUSD (chain 31612) is at the same address as on Base. The Mezo Borrow addresses are in `src/config.js`, taken from the Mezo MUSD repository.
+The Mezo mainnet agent that made the 79 calls is `0x62529F90927af6162C7a731B240eDA821A43dA2B`. The Mezo Borrow addresses are in `src/config.js`, taken from the Mezo MUSD repository.
 
 ## Run your own gateway
 
@@ -125,7 +148,8 @@ A network without its own treasury and settler key refuses to start. More settin
 
 ## Limits, as they stand today
 
-- **Mezo testnet is test money.** Base is real MUSD. The live gateway sells on those two. Mezo mainnet is supported in the code and tested, but not turned on.
+- **Mezo testnet is test money.** Base and Mezo mainnet are real MUSD. The only payer on Mezo mainnet so far is our own agent, so mainnet shows that it works, not that anyone outside wants it.
+- **Mezo mainnet gas is about 2.4 cents a call** (measured: 79 settlements cost the settler 0.000026 BTC, 3.3e-7 BTC each, at BTC near $73,700), a little above the 2 cent surcharge. The mainnet settler held 0.0000775 BTC after the batch, about 235 more settlements. Only the `permit` scheme was used on mainnet; the `transfer` scheme there needs BTC in the payer wallet for gas and was not tested.
 - **MUSD on Base is thinly traded.** The pool above held about $430 of liquidity when checked, and selling 100 MUSD there returned about 0.968 USDC per MUSD. Buy small.
 - **The trove floor is off-chain** and only as good as the bot's reads (see above). Draws work on Mezo only, and the demo above is on testnet.
 - **One permit at a time per wallet**, and one call at a time per registered agent across networks.

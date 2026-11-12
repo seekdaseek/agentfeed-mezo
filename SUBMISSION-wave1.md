@@ -1,3 +1,5 @@
+> **SUPERSEDED. These are the Wave 1 form answers (deadline 26 Oct 2026), kept for history. The Wave 2 text is [`WAVE2-UPDATE.txt`](WAVE2-UPDATE.txt) and the checklist is [`CHECKLIST.md`](CHECKLIST.md).** The milestones below (mainnet, Base, bot) were the plan for Wave 2; the status is in those files.
+
 # AKINDO submission: draft answers
 
 Mezo Buildathon, Wave 1 (deadline 26 Oct 2026, 17:00 Chisinau / 15:00 UTC). Nothing here has been submitted. Fields follow the AKINDO form.

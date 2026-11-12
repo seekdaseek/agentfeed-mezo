@@ -1,3 +1,5 @@
+> **SUPERSEDED. This is the Wave 1 checklist (Oct 25 2026), kept for history. The Wave 2 checklist is [`CHECKLIST.md`](CHECKLIST.md).** Its numbers (67 paid calls, testnet only, "nothing is on Mezo mainnet") are Wave 1 numbers and are no longer true.
+
 **67 paid calls, 1.26 MUSD settled on Mezo testnet (chain 31611), each one a transaction on explorer.test.mezo.org, from a live API (AgentFeed) with 83 paid routes.** Counted from the gateway's own ledger at `/payments.csv` at the time of writing; the live number is at https://mezo.ochinimus.app/stats.
 
 # Mezo Buildathon, Wave 1: submission checklist
