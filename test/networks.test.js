@@ -234,3 +234,31 @@ describe('a lagging RPC cannot hand back a permit nonce that was just used', () 
     assert.equal((await fetch(`${ctx.url}/nonce/8453/nope`)).status, 404);
   });
 });
+
+describe('landing page is rendered from the networks the gateway offers', () => {
+  test('names every network, mainnet first, with chain ids, price rule, settler and explorer links, and no testnet-only sentence', async () => {
+    const html = await (await fetch(ctx.url)).text();
+    for (const n of ctx.cfg.networks) {
+      assert.ok(html.includes(n.label), `names ${n.label}`);
+      assert.ok(html.includes(`<td class="n">${n.chainId}</td>`), `shows chain id ${n.chainId}`);
+      const settler = ctx.settlers[n.network].address;
+      assert.ok(html.includes(`<a href="${n.explorer}/address/${settler}">`), `links the ${n.label} settler on its explorer`);
+      assert.ok(html.includes(`<a href="${n.explorer}/token/${n.asset.address}">`), `links MUSD on ${n.label}`);
+    }
+    assert.ok(html.includes('31612') && html.includes('8453'));
+    assert.ok(html.indexOf('<b>Mezo mainnet</b>') < html.indexOf('<b>Base</b>') && html.indexOf('<b>Mezo mainnet</b>') < html.indexOf('<b>Mezo testnet</b>'), 'Mezo mainnet is listed first');
+    assert.match(html, /paid per call in MUSD on Mezo mainnet, Mezo testnet and Base\./);
+    assert.match(html, /naming MUSD on Mezo mainnet, Mezo testnet and Base,/);
+    assert.ok(html.includes('route price + 0.02 MUSD for gas'));
+    assert.ok(html.includes('href="/stats"'));
+    assert.doesNotMatch(html, /Network: Mezo testnet|MUSD on Mezo testnet\.|naming MUSD on Mezo testnet,/);
+  });
+  test('the routes table shows the route price and the Mezo mainnet price, route price plus 0.02', async () => {
+    const html = await (await fetch(ctx.url)).text();
+    assert.ok(html.includes('<th class="n">Mezo mainnet</th>'));
+    const row = html.match(/<tr><td><code>\/api\/sol-price<\/code>.*?<\/tr>/)[0];
+    const base = ((sol.cents) / 100).toFixed(2), main = ((sol.cents + 2) / 100).toFixed(2);
+    assert.ok(row.includes(`<td class="n">${base} MUSD</td><td class="n">${main} MUSD</td>`), row);
+    assert.equal(Math.round((Number(main) - Number(base)) * 100), 2);
+  });
+});
