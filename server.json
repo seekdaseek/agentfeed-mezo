@@ -8,12 +8,12 @@
     "url": "https://github.com/seekdaseek/agentfeed-mezo",
     "source": "github"
   },
-  "version": "0.2.0",
+  "version": "0.2.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@seekdaseek/agentfeed-mezo",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

@@ -1,6 +1,6 @@
 {
   "name": "@seekdaseek/agentfeed-mezo",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Pay AgentFeed per call in MUSD on Mezo and Base. An MCP server and CLI for agents, plus the HTTP 402 gateway behind mezo.ochinimus.app.",
   "mcpName": "io.github.seekdaseek/agentfeed-mezo",
   "type": "module",
