@@ -2,6 +2,10 @@
 
 Live crypto data for AI agents, paid per call in **MUSD**, the Bitcoin-backed dollar on Mezo. The agent signs one permit and pays no gas. There is no account and no API key.
 
+Video: https://youtu.be/vcQcw8-vMkg
+
+Deck: https://github.com/seekdaseek/agentfeed-mezo/blob/main/deck/agentfeed-mezo-deck-wave2.pdf
+
 The gateway at https://mezo.ochinimus.app answers `402 Payment Required` with a price, the token, the network and a one-time nonce. The agent signs an EIP-2612 permit for exactly that amount, sends the request again, and gets the data back with a link to the settlement. If the data cannot be fetched, nothing is charged.
 
 It sells AgentFeed's market data (prices, liquidations, funding, a page summary) and two routes about Mezo itself: where MUSD trades against a dollar, and the health of a Mezo trove. The people who run agents can keep them on a budget from Telegram.

@@ -2,7 +2,7 @@
 
 # Mezo Buildathon, Wave 2: checklist
 
-Project: **agentfeed-mezo**, Track 2 (Access and Distribution). Repo https://github.com/seekdaseek/agentfeed-mezo. Live https://mezo.ochinimus.app. MIT. Wave 2 deadline Nov 15 2026, 17:00 Chisinau. Nothing has been submitted or posted.
+Project: **agentfeed-mezo**, Track 2 (Access and Distribution). Repo https://github.com/seekdaseek/agentfeed-mezo. Live https://mezo.ochinimus.app. MIT. Wave 2 deadline Nov 15 2026, 17:00 Chisinau. The demo video is on YouTube (https://youtu.be/vcQcw8-vMkg); nothing has been submitted to AKINDO or posted on X.
 
 ## 1. What the Wave 1 judges said, and what changed
 
@@ -21,7 +21,7 @@ Wave 1 scores: Mezo Integration 4, Product and Business 6, Technical 8, UX 6, Ma
 | **Product and Business Viability (30%)** | A live API with real paid routes gets one more rail. The owner's problem is agents with a spending limit: budget, daily cap, pause, revoke, a call over budget refused before anything is settled. Honest gap: no outside payer yet. |
 | **Technical Implementation (20%)** | Gateway keeps one ledger with the network on every row; replay protection per network; fetch before settle; 148 tests (`npm test`, no network). A stale-permit-nonce defect on a fast chain was found with real Base payments and fixed. |
 | **User Experience (10%)** | One curl shows the 402; the client and the MCP server are one command; the agent signs one message and pays no gas; `/stats` and `/payments.csv` need no wallet. |
-| **Submission Materials (10%)** | README with the sample transactions and the funding path; this checklist; the 8-slide deck `deck-w2/agentfeed-mezo-deck-wave2.pdf` (built from live `/stats`; the folder is gitignored, so the PDF is a local file, not in the repo); the 2 minute 48 second video; `WAVE2-UPDATE.txt` (under 3,000 characters). |
+| **Submission Materials (10%)** | README with the sample transactions and the funding path; this checklist; the 8-slide deck [`deck/agentfeed-mezo-deck-wave2.pdf`](deck/agentfeed-mezo-deck-wave2.pdf) (public, built from live `/stats`); the 2 min 59 s video https://youtu.be/vcQcw8-vMkg ; `WAVE2-UPDATE.txt` (under 3,000 characters). |
 
 ## 3. Judge it in five minutes
 
@@ -29,12 +29,12 @@ Wave 1 scores: Mezo Integration 4, Product and Business 6, Technical 8, UX 6, Ma
 
 ## 4. Where the video and deck show it
 
-Video (2 min 48 s): the owner sets a budget and a cap in Telegram, a refused draw under the floor, a trove draw on testnet, a paid call on testnet with its explorer link, a call on Base, and the cap refusing the next call. **The video was cut before mainnet went live and has no mainnet scene**; it says what ran on testnet and Base. Deck slide 6 shows the mainnet funding and first call; slide 7 the live numbers.
+Video v4 (2 min 59 s, https://youtu.be/vcQcw8-vMkg; file sha256 `92e791c5d5c7bf34b469946eaca075a17a2009a4523b4d750223e4b47caef71b`): the owner sets a budget and a cap in Telegram, a refused draw under the floor, a trove draw on testnet, a paid call on testnet with its explorer link, the cap refusing the next call, a call on Base, and **a real paid call on Mezo mainnet with the Mezo mainnet line of `/stats`, narrated as paid by our own agent**. Deck [`deck/agentfeed-mezo-deck-wave2.pdf`](deck/agentfeed-mezo-deck-wave2.pdf), 8 slides: slide 6 shows the mainnet funding and first call, slide 7 the live numbers, slide 8 the honest status and the video link.
 
 ## 5. Honest status
 
-- **Done**: Mezo mainnet and Base in the same 402; the Telegram budget bot; trove draw with a floor (testnet); two Mezo routes; npm package `@seekdaseek/agentfeed-mezo` and MCP Registry listing.
-- **Not done**: Mezo BTC and MEZO as payment assets (the gateway has one asset per network, prices in MUSD cents, has no MEZO price source, and no wallet of ours holds MEZO); a mainnet trove draw (the draw is shown on testnet and labelled so); a mainnet scene in the video; any outside payer; the `transfer` payment scheme on Mezo mainnet (needs BTC in the payer wallet for gas, not tested).
+- **Done**: Mezo mainnet and Base in the same 402; the Telegram budget bot; trove draw with a floor (testnet); two Mezo routes; a mainnet scene in the video; the public Wave 2 deck; npm `@seekdaseek/agentfeed-mezo` 0.2.1 and MCP Registry 0.2.1 published, registry 0.2.0 and npm 0.0.0-stage deprecated (npm 0.2.0 left as is).
+- **Not done**: Mezo BTC and MEZO as payment assets (the gateway has one asset per network, prices in MUSD cents, has no MEZO price source, and no wallet of ours holds MEZO); a mainnet trove draw (the draw is shown on testnet and labelled so); any outside payer (0, and the 79 mainnet calls are from our own agent); the `transfer` payment scheme on Mezo mainnet (needs BTC in the payer wallet for gas, not tested).
 - **Mainnet gas**: measured 3.3e-7 BTC per settlement, about 2.4 cents, against a 2 cent surcharge; the settler holds about 235 more settlements of BTC.
 - Rules 36 to 44 of the owner's what-wins list are not in this repository, so this checklist follows the rubric above and does not claim them line by line.
 
@@ -48,4 +48,4 @@ Gateway PM2 `agentfeed-mezo` (port 3034) behind the tunnel `agentfeed-mezo-tunne
 
 ## 8. Still owed before the deadline
 
-Submit day, not before: refresh the `/stats` numbers in `WAVE2-UPDATE.txt` and the deck (`node deck-w2/check-update.mjs`, then `node deck-w2/build.mjs`); npm 0.2.1 with this README and the registry record; the owner's go to submit. Nothing is posted anywhere.
+Nov 15, not before: refresh the `/stats` numbers in `WAVE2-UPDATE.txt`, the deck, the README, this checklist and `SUBMISSION-wave2.md` (`node deck-w2/check-update.mjs`, then `node deck-w2/build.mjs`, which also rewrites the public deck copy); the owner's go to submit. Nothing is submitted to AKINDO or posted on X.

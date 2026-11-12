@@ -1,4 +1,4 @@
-> **SUPERSEDED. These are the Wave 1 form answers (deadline 26 Oct 2026), kept for history. The Wave 2 text is [`WAVE2-UPDATE.txt`](WAVE2-UPDATE.txt) and the checklist is [`CHECKLIST.md`](CHECKLIST.md).** The milestones below (mainnet, Base, bot) were the plan for Wave 2; the status is in those files.
+> **SUPERSEDED by [`SUBMISSION-wave2.md`](SUBMISSION-wave2.md).** These are the Wave 1 form answers (deadline 26 Oct 2026), kept for history. The checklist is [`CHECKLIST.md`](CHECKLIST.md). The milestones below (mainnet, Base, bot) were the plan for Wave 2; their status is in the Wave 2 sheet.
 
 # AKINDO submission: draft answers
 
