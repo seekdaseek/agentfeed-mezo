@@ -1,5 +1,6 @@
 // The only module that talks to the Mezo RPC. server.js depends on this interface, so tests inject a fake.
 import { createPublicClient, createWalletClient, http, fallback, defineChain, parseAbi, getAddress } from 'viem';
+import { dataSuffixFor } from './builder-code.js';
 import { privateKeyToAccount } from 'viem/accounts';
 
 export const MUSD_ABI = parseAbi([
@@ -54,7 +55,8 @@ export function makeChain(cfg) {
   const transport = (retry) => (urls.length > 1 ? fallback(urls.map((u) => http(u, { retryCount: 1 })), { rank: false }) : http(urls[0], { retryCount: retry }));
   const pub = createPublicClient({ chain, transport: transport(2) });
   const settler = privateKeyToAccount(cfg.settlerKey);
-  const wallet = createWalletClient({ account: settler, chain, transport: transport(0) });
+  // Base Builder Code (ERC-8021): on Base mainnet every permit() and transferFrom() this settler sends carries the suffix; undefined (nothing appended) on the Mezo chains
+  const wallet = createWalletClient({ account: settler, chain, transport: transport(0), dataSuffix: dataSuffixFor(cfg.chainId) });
   const token = getAddress((cfg.asset || cfg.musd).address);
   let sendQueue = Promise.resolve(); // serialises nonce assignment; receipts are awaited outside the queue
 

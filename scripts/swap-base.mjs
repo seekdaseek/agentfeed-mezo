@@ -3,6 +3,7 @@
 //   node scripts/swap-base.mjs [--amount 0.90] --send     approve exactly the amount, then swap with 0.5% slippage
 // The signer is the base-agent wallet from .secrets/wallets-wave2.json (a pointer to a key file, never printed).
 import { createPublicClient, createWalletClient, http, parseAbi, parseUnits, formatUnits, formatEther } from 'viem';
+import { BASE_DATA_SUFFIX } from '../src/builder-code.js';
 import { privateKeyToAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import fs from 'node:fs';
@@ -19,7 +20,7 @@ const account = privateKeyToAccount(key);
 if (account.address.toLowerCase() !== w['base-agent'].address.toLowerCase()) throw new Error('base-agent key does not match its address');
 
 const pub = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') });
-const wallet = createWalletClient({ account, chain: base, transport: http('https://mainnet.base.org') });
+const wallet = createWalletClient({ account, chain: base, transport: http('https://mainnet.base.org'), dataSuffix: BASE_DATA_SUFFIX });
 const erc = parseAbi(['function balanceOf(address) view returns (uint256)', 'function allowance(address,address) view returns (uint256)', 'function approve(address,uint256) returns (bool)']);
 const pool = parseAbi(['function factory() view returns (address)', 'function fee() view returns (uint24)', 'function liquidity() view returns (uint128)']);
 const quoter = [{ type: 'function', name: 'quoteExactInputSingle', stateMutability: 'nonpayable', inputs: [{ name: 'params', type: 'tuple', components: [{ name: 'tokenIn', type: 'address' }, { name: 'tokenOut', type: 'address' }, { name: 'amountIn', type: 'uint256' }, { name: 'fee', type: 'uint24' }, { name: 'sqrtPriceLimitX96', type: 'uint160' }] }], outputs: [{ name: 'amountOut', type: 'uint256' }, { name: 'sqrtPriceX96After', type: 'uint160' }, { name: 'initializedTicksCrossed', type: 'uint32' }, { name: 'gasEstimate', type: 'uint256' }] }];

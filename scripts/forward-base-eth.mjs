@@ -3,6 +3,7 @@
 //   node scripts/forward-base-eth.mjs          dry run (balances, nonce, estimated gas)
 //   node scripts/forward-base-eth.mjs --send   do it
 import { createPublicClient, createWalletClient, http, fallback, parseEther, formatEther } from 'viem';
+import { BASE_DATA_SUFFIX } from '../src/builder-code.js';
 import { privateKeyToAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import fs from 'node:fs';
@@ -20,7 +21,7 @@ const [b0, d0] = await Promise.all([pub.getBalance({ address: from.address }), p
 const gas = await pub.estimateGas({ account: from.address, to, value: AMOUNT });
 console.log(JSON.stringify({ from: from.address, to, amountEth: formatEther(AMOUNT), fromBalanceEth: formatEther(b0), toBalanceEth: formatEther(d0), estGas: String(gas) }));
 if (!send) process.exit(0);
-const hash = await createWalletClient({ account: from, chain: base, transport }).sendTransaction({ to, value: AMOUNT });
+const hash = await createWalletClient({ account: from, chain: base, transport, dataSuffix: BASE_DATA_SUFFIX }).sendTransaction({ to, value: AMOUNT });
 const r = await pub.waitForTransactionReceipt({ hash });
 const [b1, d1] = await Promise.all([pub.getBalance({ address: from.address }), pub.getBalance({ address: to })]);
 console.log(JSON.stringify({ status: r.status, tx: `https://basescan.org/tx/${hash}`, gasUsed: String(r.gasUsed), fromBalanceEth: formatEther(b1), toBalanceEth: formatEther(d1) }));

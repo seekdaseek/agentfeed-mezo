@@ -8,6 +8,7 @@
 //   node scripts/bridge-musd-base.mjs bridge          dry run (simulates the transfer)
 //   node scripts/bridge-musd-base.mjs bridge --send
 import { createPublicClient, createWalletClient, http, fallback, parseAbi, formatUnits, formatEther, pad } from 'viem';
+import { BASE_DATA_SUFFIX } from '../src/builder-code.js';
 import { privateKeyToAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import fs from 'node:fs';
@@ -23,7 +24,7 @@ if (account.address.toLowerCase() !== wm['funder-base-mezo'].address.toLowerCase
 const agent = wm['mezo-mainnet-agent'].address;
 const transport = fallback([http('https://mainnet.base.org', { retryCount: 1 }), http('https://base.drpc.org', { retryCount: 1 })], { rank: false });
 const pub = createPublicClient({ chain: base, transport });
-const wallet = createWalletClient({ account, chain: base, transport });
+const wallet = createWalletClient({ account, chain: base, transport, dataSuffix: BASE_DATA_SUFFIX });
 const erc = parseAbi(['function balanceOf(address) view returns (uint256)', 'function allowance(address,address) view returns (uint256)', 'function approve(address,uint256) returns (bool)']);
 const pool = parseAbi(['function factory() view returns (address)', 'function fee() view returns (uint24)']);
 const quoter = [{ type: 'function', name: 'quoteExactInputSingle', stateMutability: 'nonpayable', inputs: [{ name: 'params', type: 'tuple', components: [{ name: 'tokenIn', type: 'address' }, { name: 'tokenOut', type: 'address' }, { name: 'amountIn', type: 'uint256' }, { name: 'fee', type: 'uint24' }, { name: 'sqrtPriceLimitX96', type: 'uint160' }] }], outputs: [{ name: 'amountOut', type: 'uint256' }, { name: 'sqrtPriceX96After', type: 'uint160' }, { name: 'initializedTicksCrossed', type: 'uint32' }, { name: 'gasEstimate', type: 'uint256' }] }];

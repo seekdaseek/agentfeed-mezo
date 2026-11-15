@@ -1,6 +1,7 @@
 // Send MUSD from treasury-hot back to base-agent on Base, so evidence runs need no new money. Only these two wallets, nothing else.
 //   node scripts/recycle-base.mjs [amount in MUSD | all] [--send]      dry run unless --send
 import { createPublicClient, createWalletClient, http, fallback, parseAbi, parseUnits, formatUnits, formatEther } from 'viem';
+import { BASE_DATA_SUFFIX } from '../src/builder-code.js';
 import { privateKeyToAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import fs from 'node:fs';
@@ -12,7 +13,7 @@ const to = w['base-agent'].address;
 if (from.address.toLowerCase() !== w['treasury-hot'].address.toLowerCase()) throw new Error('treasury-hot key does not match its address');
 const transport = fallback([http('https://mainnet.base.org', { retryCount: 1 }), http('https://base.drpc.org', { retryCount: 1 })], { rank: false });
 const pub = createPublicClient({ chain: base, transport });
-const wallet = createWalletClient({ account: from, chain: base, transport });
+const wallet = createWalletClient({ account: from, chain: base, transport, dataSuffix: BASE_DATA_SUFFIX });
 const abi = parseAbi(['function balanceOf(address) view returns (uint256)', 'function transfer(address,uint256) returns (bool)']);
 const bal = await pub.readContract({ address: MUSD, abi, functionName: 'balanceOf', args: [from.address] });
 const arg = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'all';

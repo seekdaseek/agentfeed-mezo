@@ -4,6 +4,7 @@
 //   node scripts/return-base.mjs --send     do it
 // The destination is fixed in this file on purpose; there is no flag to change it.
 import { createPublicClient, createWalletClient, http, fallback, parseAbi, formatUnits, formatEther } from 'viem';
+import { BASE_DATA_SUFFIX } from '../src/builder-code.js';
 import { privateKeyToAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import fs from 'node:fs';
@@ -21,7 +22,7 @@ if (agent.address.toLowerCase() !== w['base-agent'].address.toLowerCase() || tre
 
 const transport = fallback([http('https://mainnet.base.org', { retryCount: 1 }), http('https://base.drpc.org', { retryCount: 1 })], { rank: false });
 const pub = createPublicClient({ chain: base, transport });
-const wallet = (acct) => createWalletClient({ account: acct, chain: base, transport });
+const wallet = (acct) => createWalletClient({ account: acct, chain: base, transport, dataSuffix: BASE_DATA_SUFFIX });
 const erc = parseAbi(['function balanceOf(address) view returns (uint256)', 'function allowance(address,address) view returns (uint256)', 'function approve(address,uint256) returns (bool)', 'function transfer(address,uint256) returns (bool)']);
 const quoter = [{ type: 'function', name: 'quoteExactInputSingle', stateMutability: 'nonpayable', inputs: [{ name: 'params', type: 'tuple', components: [{ name: 'tokenIn', type: 'address' }, { name: 'tokenOut', type: 'address' }, { name: 'amountIn', type: 'uint256' }, { name: 'fee', type: 'uint24' }, { name: 'sqrtPriceLimitX96', type: 'uint160' }] }], outputs: [{ type: 'uint256' }, { type: 'uint160' }, { type: 'uint32' }, { type: 'uint256' }] }];
 const router = [{ type: 'function', name: 'exactInputSingle', stateMutability: 'payable', inputs: [{ name: 'params', type: 'tuple', components: [{ name: 'tokenIn', type: 'address' }, { name: 'tokenOut', type: 'address' }, { name: 'fee', type: 'uint24' }, { name: 'recipient', type: 'address' }, { name: 'amountIn', type: 'uint256' }, { name: 'amountOutMinimum', type: 'uint256' }, { name: 'sqrtPriceLimitX96', type: 'uint160' }] }], outputs: [{ type: 'uint256' }] }];

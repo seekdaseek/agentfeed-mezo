@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Agent client: pays AgentFeed-on-Mezo routes in MUSD. Library + CLI.
 import { createPublicClient, createWalletClient, http, fallback, parseAbi, getAddress } from 'viem';
+import { dataSuffixFor } from './builder-code.js';
 import { privateKeyToAccount } from 'viem/accounts';
 import { pathToFileURL } from 'node:url';
 import { MEZO_TESTNET, MUSD, NETWORK_DEFS } from './config.js';
@@ -28,7 +29,7 @@ export function createAgent({
   const urls = [rpcUrl, ...NETWORK_DEFS[networkKey].rpcUrls.filter((u) => u !== rpcUrl)];
   const transport = urls.length > 1 ? fallback(urls.map((u) => http(u, { retryCount: 1 })), { rank: false }) : http(rpcUrl);
   const pub = createPublicClient({ chain, transport });
-  const wallet = createWalletClient({ account, chain, transport });
+  const wallet = createWalletClient({ account, chain, transport, dataSuffix: dataSuffixFor(chain.id) });   // ERC-8021 Base Builder Code on Base mainnet only
   baseUrl = baseUrl.replace(/\/$/, "");
 
   // a permit nonce only goes up: read it from every RPC we know and take the highest, so a lagging node cannot return a used one
